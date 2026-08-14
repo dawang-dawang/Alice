@@ -2005,7 +2005,7 @@ const App = {
       </div>
     </aside>
     <main class="main">
-      <button class="menu-btn" :class="{open:menuOpen}" :style="{left:menuPos.x+'px', top:menuPos.y+'px'}" @pointerdown="menuDown"><span><img src="icons/helloKitty.png" alt="Hello Kitty"></span></button>
+      <button class="menu-btn" :class="{open:menuOpen}" :style="{left:menuPos.x+'px', top:menuPos.y+'px'}" @pointerdown="menuDown"><span><img src="icons/helloKitty_trans.png" alt="Hello Kitty"></span></button>
       <component :is="compMap[current]" @goto="goto"></component>
     </main>
 
