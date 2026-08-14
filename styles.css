@@ -42,7 +42,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 
 /* 侧边栏 */
 .sidebar {
-  width: 212px; flex: 0 0 212px; background: linear-gradient(180deg, #fff5f8, #fff0f4);
+  width: 174px; flex: 0 0 174px; background: linear-gradient(180deg, #fff5f8, #fff0f4);
   border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 18px 13px;
   position: relative;
 }
@@ -63,17 +63,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .nav-ico { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .nav-ico img { width: 36px; height: 36px; object-fit: cover; border-radius: 8px; }
 .nav-name { font-size: 13px; font-weight: 600; }
-/* 菜单项背景交替配色：宝宝养育(第8)纯白，其余浅色系交替 */
-.nav-item:nth-child(1) { background: #ffeef4; }
-.nav-item:nth-child(2) { background: #fffafc; }
-.nav-item:nth-child(3) { background: #f3e9ff; }
-.nav-item:nth-child(4) { background: #fffafc; }
-.nav-item:nth-child(5) { background: #fff7e1; }
-.nav-item:nth-child(6) { background: #fffafc; }
-.nav-item:nth-child(7) { background: #e8f7ef; }
-.nav-item:nth-child(8) { background: #ffffff; }
-.nav-item:nth-child(9) { background: #e3f0ff; }
-.nav-item:nth-child(10) { background: #f7e9ff; }
+/* 菜单项背景：首页标签同款黄 / 白色交替 */
+.nav-item:nth-child(odd) { background: #fdf0dc; }
+.nav-item:nth-child(even) { background: #ffffff; }
 .badge { margin-left: auto; background: var(--qing); color: #c2516e; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 1px 8px; }
 .nav-item.active .badge { background: rgba(255,255,255,.65); color: #d96b8a; }
 .sidebar-foot { display: flex; flex-direction: column; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); margin-bottom: 30px; }
