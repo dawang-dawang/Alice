@@ -1960,8 +1960,9 @@ const App = {
       catch (e) { showToast(e.message); }
     }
     function logout() { authLogout(); showToast("已退出登录"); }
+    const accOpen = ref(false);
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
   },
   template: `
   <div class="app">
@@ -1976,25 +1977,27 @@ const App = {
       </nav>
       <div class="sidebar-foot">
         <div class="acc-box" v-if="AUTH_ENABLED">
-          <template v-if="!authState.user">
-            <div class="acc-title">💬 账号云同步</div>
-            <div class="acc-btns">
+          <button class="acc-main" @click="accOpen=!accOpen">
+            <template v-if="!authState.user">👤 账号与数据 <span class="acc-caret">{{accOpen?'▲':'▼'}}</span></template>
+            <template v-else>👤 {{authState.user.username}} <span class="acc-caret">{{accOpen?'▲':'▼'}}</span></template>
+          </button>
+          <div v-if="accOpen" class="acc-btns">
+            <template v-if="!authState.user">
               <button class="btn-ghost" @click="openLogin">🔑 登录</button>
               <button class="btn-ghost" @click="openRegister">✨ 注册</button>
-            </div>
-          </template>
-          <template v-else>
-            <div class="acc-title">👤 {{authState.user.username}} <span style="font-size:10px;color:var(--text-mute)">已登录</span></div>
-            <div class="acc-btns">
+            </template>
+            <template v-else>
               <button class="btn-ghost" @click="doSyncPush">⬆️ 上传</button>
               <button class="btn-ghost" @click="doSyncPull">⬇️ 拉取</button>
               <button class="btn-ghost" @click="pwForm.show=true">🔒 改密</button>
               <button class="btn-ghost" @click="logout">🚪 退出</button>
-            </div>
-          </template>
+            </template>
+            <button class="btn-ghost" @click="doExport">💾 导出备份</button>
+            <button class="btn-ghost" @click="triggerImport">📥 导入备份</button>
+          </div>
         </div>
-        <button class="btn-ghost" @click="doExport">⬇️ 导出备份</button>
-        <button class="btn-ghost" @click="triggerImport">⬆️ 导入备份</button>
+        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="doExport">⬇️ 导出备份</button>
+        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="triggerImport">⬆️ 导入备份</button>
         <input ref="fileInput" type="file" accept="application/json" hidden @change="doImport">
       </div>
     </aside>
