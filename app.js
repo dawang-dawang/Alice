@@ -64,7 +64,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811ck", tasks: "icons/日程管理.png?v=20260811ck", memo: "icons/备忘录.png?v=20260811ck", anniv: "icons/纪念日.png?v=20260811ck", finance: "icons/理财管理.png?v=20260811ck", sport: "icons/减脂管理.png?v=20260811ck", plants: "icons/我的植物.png?v=20260811ck", baby: "icons/宝宝养育.png?v=20260811ck", express: "icons/表达能力.png?v=20260811ck", brain: "icons/前额叶训练.png?v=20260811ck" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811cl", tasks: "icons/日程管理.png?v=20260811cl", memo: "icons/备忘录.png?v=20260811cl", anniv: "icons/纪念日.png?v=20260811cl", finance: "icons/理财管理.png?v=20260811cl", sport: "icons/减脂管理.png?v=20260811cl", plants: "icons/我的植物.png?v=20260811cl", baby: "icons/宝宝养育.png?v=20260811cl", express: "icons/表达能力.png?v=20260811cl", brain: "icons/前额叶训练.png?v=20260811cl" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -1971,10 +1971,10 @@ const App = {
   <div class="app">
     <div class="menu-mask" v-if="menuOpen" @click="toggleMenu"></div>
     <aside class="sidebar" :class="{open:menuOpen}">
-      <div class="brand"><div class="brand-logo" v-html="DOG_SVG"></div><div class="brand-text"><div class="brand-title">一瓶生活记录</div><div class="brand-sub">{{todayLabel}}</div></div></div>
+      <div class="brand"><div class="brand-logo"><img src="icons/helloKitty.png" alt="Hello Kitty"></div><div class="brand-text"><div class="brand-title">一瓶生活记录</div><div class="brand-sub">{{todayLabel}}</div></div></div>
       <nav class="nav">
         <button class="nav-item" v-for="n in nav" :key="n.key" :class="{active:current===n.key}" @click="goto(n.key)">
-          <span class="nav-ico" :title="n.name"><img :src="iconFor(n.ico)" :alt="n.name"></span>
+          <span class="nav-ico"><img :src="iconFor(n.ico)" :alt="n.name"></span><span class="nav-name">{{n.name}}</span>
           <span v-if="(n.key==='tasks'&&badges.tasks) || (n.key==='plants'&&badges.plants)" class="badge">{{n.key==='tasks'?badges.tasks:badges.plants}}</span>
         </button>
       </nav>
@@ -2005,7 +2005,7 @@ const App = {
       </div>
     </aside>
     <main class="main">
-      <button class="menu-btn" :class="{open:menuOpen}" :style="{left:menuPos.x+'px', top:menuPos.y+'px'}" @pointerdown="menuDown"><span v-html="DOG_SVG"></span></button>
+      <button class="menu-btn" :class="{open:menuOpen}" :style="{left:menuPos.x+'px', top:menuPos.y+'px'}" @pointerdown="menuDown"><span><img src="icons/helloKitty.png" alt="Hello Kitty"></span></button>
       <component :is="compMap[current]" @goto="goto"></component>
     </main>
 
