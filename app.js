@@ -267,7 +267,7 @@ function syncPlanTasks() {
    - 配置：SUPA_URL / SUPA_ANON 填你的 Supabase 项目地址与 anon key
    - 启用：把 AUTH_ENABLED 改为 true，并在 index.html 填好 Supabase 配置
    ========================================================= */
-const AUTH_ENABLED = false; // ← 登录功能总开关
+const AUTH_ENABLED = true; // ← 登录功能总开关
 const SUPA_URL = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) ? SUPABASE_URL : "";
 const SUPA_ANON = (typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : "";
 const authState = reactive({ user: null, token: "" });
