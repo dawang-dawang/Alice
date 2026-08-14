@@ -2051,7 +2051,7 @@ saveAll();
 
 const app = createApp(App);
 const G = app.config.globalProperties;
-G.state = state; G.fmtDate = fmtDate; G.fmtDateTime = fmtDateTime; G.iconSvg = iconSvg;
+G.state = state; G.fmtDate = fmtDate; G.fmtDateTime = fmtDateTime; G.iconSvg = iconSvg; G.iconFor = iconFor;
 G.dayDiff = dayDiff; G.addDays = addDays; G.todayStr = todayStr; G.toastMsg = toastMsg;
 app.component("dashboard", Dashboard);
 app.component("tasks", Tasks);
