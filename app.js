@@ -350,7 +350,7 @@ const Dashboard = {
         <div class="sub">农历 {{lunar.text}}　{{lunar.term ? '· '+lunar.term : ''}}　{{lunar.full}}</div>
       </div>
       <div class="slogan">“{{slogan}}”</div>
-      <div class="dog" v-html="DOG_SVG"></div>
+      <div class="dog"><img src="icons/bow.png" alt="蝴蝶结"></div>
     </div>
 
     <div class="dash-grid">
