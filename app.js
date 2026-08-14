@@ -222,15 +222,21 @@ async function supaFetch(path, method, body, anon) {
   }
   return j;
 }
-/* 注册：email + 密码（Supabase 默认需邮箱验证，未验证无法登录；可用 service role 或关闭 email confirm） */
-async function authRegister(email, password) {
-  const j = await supaFetch("/auth/v1/signup", "POST", { email, password }, true);
-  authState.user = { id: j.user.id, username: j.user.email }; authState.token = j.access_token; persistAuth(); return authState.user;
+/* 账号归一化：输入"账号或邮箱"，账号自动转成虚拟邮箱（编码@wb.local），Supabase 底层仍按邮箱认证 */
+function normAccount(acc) {
+  const a = (acc || "").trim();
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) return a; // 已像邮箱：直接用
+  return encodeURIComponent(a).replace(/%/g, "_").toLowerCase() + "@wb.local"; // 账号 → 编码虚拟邮箱（唯一、可复现）
 }
-/* 登录：email + 密码 */
-async function authLogin(email, password) {
-  const j = await supaFetch("/auth/v1/token?grant_type=password", "POST", { email, password }, true);
-  authState.user = { id: j.user.id, username: j.user.email }; authState.token = j.access_token; persistAuth(); return authState.user;
+/* 注册：账号/邮箱 + 密码（Confirm email 已关闭，注册即登录） */
+async function authRegister(acc, password) {
+  const j = await supaFetch("/auth/v1/signup", "POST", { email: normAccount(acc), password }, true);
+  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; persistAuth(); return authState.user;
+}
+/* 登录：账号/邮箱 + 密码 */
+async function authLogin(acc, password) {
+  const j = await supaFetch("/auth/v1/token?grant_type=password", "POST", { email: normAccount(acc), password }, true);
+  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; persistAuth(); return authState.user;
 }
 function authLogout() { authState.user = null; authState.token = ""; persistAuth(); }
 /* 修改密码（需已登录；Supabase 返回 200 但邮箱会收到改密确认链接，用 manage 方式需要 service key） */
@@ -1925,14 +1931,15 @@ const App = {
     function openRegister() { Object.assign(authForm, { show: true, mode: "register", email: "", password: "", busy: false }); }
     async function submitAuth() {
       if (authForm.busy) return;
-      const email = authForm.email.trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showToast("请输入正确的邮箱");
+      const acc = authForm.email.trim();
+      if (!acc) return showToast("请输入账号或邮箱");
+      if (acc.length < 2) return showToast("账号至少 2 个字符");
       if (authForm.password.length < 6) return showToast("密码至少 6 位");
       authForm.busy = true;
       try {
-        const u = authForm.mode === "register" ? await authRegister(email, authForm.password) : await authLogin(email, authForm.password);
+        const u = authForm.mode === "register" ? await authRegister(acc, authForm.password) : await authLogin(acc, authForm.password);
         authForm.show = false;
-        showToast(authForm.mode === "register" ? "注册成功！请查收邮箱验证后登录" : "欢迎，" + u.username + "！");
+        showToast(authForm.mode === "register" ? "注册成功，" + u.username + "！" : "欢迎，" + u.username + "！");
       } catch (e) { showToast(e.message); }
       authForm.busy = false;
     }
@@ -2001,7 +2008,7 @@ const App = {
       <div class="modal">
         <div class="modal-head"><span>{{authForm.mode==='register'?'注册账号':'账号登录'}}</span><button class="modal-close" @click="authForm.show=false">✕</button></div>
         <div class="modal-body">
-          <div class="field"><label>邮箱</label><input class="input" type="email" v-model="authForm.email" placeholder="you@example.com" @keyup.enter="submitAuth"></div>
+          <div class="field"><label>账号 / 邮箱</label><input class="input" v-model="authForm.email" placeholder="输入账号或邮箱" @keyup.enter="submitAuth"></div>
           <div class="field"><label>密码</label><input class="input" type="password" v-model="authForm.password" placeholder="至少 6 位" @keyup.enter="submitAuth"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn gray" @click="authForm.mode = authForm.mode==='register' ? 'login' : 'register'">{{authForm.mode==='register'?'← 已有账号去登录':'注册新账号 →'}}</button>
