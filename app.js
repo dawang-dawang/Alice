@@ -63,6 +63,9 @@ const ICON_SVGS = {
 function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
+/* 模块 → Hello Kitty PNG 图标（log/ 文件夹） */
+const HK_ICONS = { home: "icons/首页.png", tasks: "icons/日程管理.png", memo: "icons/备忘录.png", anniv: "icons/纪念日.png", finance: "icons/理财管理.png", sport: "icons/减脂管理.png", plants: "icons/我的植物.png", baby: "icons/宝宝养育.png", express: "icons/表达能力.png", brain: "icons/前额叶训练.png" };
+function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
 function svgPie(data) {
@@ -352,7 +355,7 @@ const Dashboard = {
 
     <div class="dash-grid">
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','tasks')">
-        <h3><span class="mt-ico" v-html="iconSvg('tasks')"></span>待办事件 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('tasks')"></span>待办事件 <span class="go-hint">查看 ›</span></h3>
         <div class="row2">
           <div class="mini"><div class="mv">{{tasksActive}}</div><div class="mk">未完成总数</div></div>
           <div class="mini"><div class="mv">{{tasksToday}}</div><div class="mk">今日待办</div></div>
@@ -361,7 +364,7 @@ const Dashboard = {
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','anniv')">
-        <h3><span class="mt-ico" v-html="iconSvg('anniv')"></span>最近纪念日 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('anniv')"></span>最近纪念日 <span class="go-hint">查看 ›</span></h3>
         <div class="dash-line" v-for="a in annivNear" :key="a.id">
           <span>{{a.name}} <span class="tag gray" style="font-size:10px">{{a.type}}</span></span>
           <b :style="{color: a.days<=7 ? 'var(--warn)' : 'var(--text-soft)'}">{{a.days===0?'今天！':a.days+' 天后'}}</b>
@@ -370,7 +373,7 @@ const Dashboard = {
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','plants')">
-        <h3><span class="mt-ico" v-html="iconSvg('plants')"></span>绿植状态 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('plants')"></span>绿植状态 <span class="go-hint">查看 ›</span></h3>
         <div class="row2">
           <div class="mini"><div class="mv">{{plantsTotal}}</div><div class="mk">养护中总数</div></div>
           <div class="mini"><div class="mv warn">{{plantsNeed}}</div><div class="mk">今日需养护</div></div>
@@ -378,7 +381,7 @@ const Dashboard = {
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','sport')">
-        <h3><span class="mt-ico" v-html="iconSvg('sport')"></span>减脂数据 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('sport')"></span>减脂数据 <span class="go-hint">查看 ›</span></h3>
         <div class="row2">
           <div class="mini"><div class="mv">{{sportToday.burn}}</div><div class="mk">运动消耗(kcal)</div></div>
           <div class="mini"><div class="mv">{{sportToday.intake}}</div><div class="mk">饮食摄入(kcal)</div></div>
@@ -387,7 +390,7 @@ const Dashboard = {
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','finance')">
-        <h3><span class="mt-ico" v-html="iconSvg('finance')"></span>理财概览 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('finance')"></span>理财概览 <span class="go-hint">查看 ›</span></h3>
         <div class="dash-line"><span>本月收入</span><b style="color:var(--green-deep)">+{{finMonth.inc}}</b></div>
         <div class="dash-line"><span>本月支出</span><b style="color:var(--danger)">−{{finMonth.exp}}</b></div>
         <div class="dash-line"><span>本月结余</span><b>{{finMonth.bal}}</b></div>
@@ -395,7 +398,7 @@ const Dashboard = {
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','baby')">
-        <h3><span class="mt-ico" v-html="iconSvg('baby')"></span>成长曲线 <span class="go-hint">查看 ›</span></h3>
+        <h3><span class="mt-ico"><img :src="iconFor('baby')"></span>成长曲线 <span class="go-hint">查看 ›</span></h3>
         <div v-if="growthChart" v-html="growthChart"></div>
         <div v-else class="empty" style="padding:14px 0">暂无成长数据，去「宝宝养育」记录身高体重吧～</div>
       </div>
@@ -474,7 +477,7 @@ const Tasks = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
       <div style="display:flex;gap:8px"><button class="btn gray" @click="clearDone">清空已完成</button><button class="btn" @click="openAdd">＋ 新事件</button></div>
     </div>
 
@@ -598,7 +601,7 @@ const Memo = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('memo')"></span>备忘录</div><div class="module-desc">碎片化记录，按分类归档</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('memo')"></span>备忘录</div><div class="module-desc">碎片化记录，按分类归档</div></div>
       <div style="display:flex;gap:8px"><button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button><button class="btn" @click="openAdd">＋ 新建备忘</button></div>
     </div>
     <div class="toolbar">
@@ -781,7 +784,7 @@ const Plants = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('plants')"></span>我的植物</div><div class="module-desc">联网植物库选种，天气+光照智能推算养护</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('plants')"></span>我的植物</div><div class="module-desc">联网植物库选种，天气+光照智能推算养护</div></div>
       <button class="btn" @click="openAdd">＋ 添加植物</button>
     </div>
     <div class="grid cards-auto">
@@ -1123,7 +1126,7 @@ const Sport = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('sport')"></span>减脂管理</div><div class="module-desc">热量缺口 = 基础代谢 + 运动消耗 − 饮食摄入</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('sport')"></span>减脂管理</div><div class="module-desc">热量缺口 = 基础代谢 + 运动消耗 − 饮食摄入</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn gray" @click="openProf">⚙️ 基础设置</button>
         <button class="btn gray" @click="openAct">＋ 运动项目</button>
@@ -1262,7 +1265,7 @@ const Finance = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('finance')"></span>理财管理</div><div class="module-desc">收支台账，结余一目了然</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('finance')"></span>理财管理</div><div class="module-desc">收支台账，结余一目了然</div></div>
       <div style="display:flex;gap:8px"><button class="btn line" @click="open('income')">＋ 收入</button><button class="btn" @click="open('expense')">＋ 支出</button></div>
     </div>
     <div class="stats">
@@ -1325,7 +1328,7 @@ const Anniv = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('anniv')"></span>纪念日</div><div class="module-desc">重要日子自动倒数，并同步到日程管理日历</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('anniv')"></span>纪念日</div><div class="module-desc">重要日子自动倒数，并同步到日程管理日历</div></div>
       <button class="btn" @click="openAdd">＋ 新建</button>
     </div>
     <div class="grid cards-auto">
@@ -1442,7 +1445,7 @@ const Baby = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('baby')"></span>宝宝养育</div><div class="module-desc">{{state.babyProfile.name||'宝宝'}}{{age?(' · '+age.text):''}} · 成长精细化记录</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('baby')"></span>宝宝养育</div><div class="module-desc">{{state.babyProfile.name||'宝宝'}}{{age?(' · '+age.text):''}} · 成长精细化记录</div></div>
       <div style="display:flex;gap:8px"><button class="btn gray" @click="openProf">🍼 宝宝信息</button><button class="btn" @click="openAdd">＋ 记一笔</button></div>
     </div>
 
@@ -1675,7 +1678,7 @@ const Express = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('express')"></span>表达能力</div><div class="module-desc">每 30 天一轮训练计划，每天练一个</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('express')"></span>表达能力</div><div class="module-desc">每 30 天一轮训练计划，每天练一个</div></div>
     </div>
 
     <div class="card plan-card" style="margin-bottom:14px">
@@ -1821,7 +1824,7 @@ const Brain = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico" v-html="iconSvg('brain')"></span>前额叶训练</div><div class="module-desc">每日一局脑力游戏 · {{today}}</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('brain')"></span>前额叶训练</div><div class="module-desc">每日一局脑力游戏 · {{today}}</div></div>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -1962,7 +1965,7 @@ const App = {
     function logout() { authLogout(); showToast("已退出登录"); }
     const accOpen = ref(false);
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
   },
   template: `
   <div class="app">
@@ -1971,7 +1974,7 @@ const App = {
       <div class="brand"><div class="brand-logo" v-html="DOG_SVG"></div><div class="brand-text"><div class="brand-title">一瓶生活记录</div><div class="brand-sub">{{todayLabel}}</div></div></div>
       <nav class="nav">
         <button class="nav-item" v-for="n in nav" :key="n.key" :class="{active:current===n.key}" @click="goto(n.key)">
-          <span class="nav-ico" v-html="iconSvg(n.ico)"></span><span>{{n.name}}</span>
+          <span class="nav-ico" :title="n.name"><img :src="iconFor(n.ico)" :alt="n.name"></span>
           <span v-if="(n.key==='tasks'&&badges.tasks) || (n.key==='plants'&&badges.plants)" class="badge">{{n.key==='tasks'?badges.tasks:badges.plants}}</span>
         </button>
       </nav>
