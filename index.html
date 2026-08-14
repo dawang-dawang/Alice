@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一瓶生活记录</title>
+  <link rel="icon" href="favicon.ico" sizes="any" />
+  <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ff8a5c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="一瓶生活记录" />
+  <!-- Supabase 配置（云同步用）：把下面两个值替换成你项目的 URL 与 anon public key -->
+  <script>window.SUPABASE_URL = ""; window.SUPABASE_ANON_KEY = "";</script>
+  <link rel="stylesheet" href="styles.css?v=20260811cc" />
+<script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
+<script>
+(function(){
+  try{
+    var beacon=new BeaconAction({
+      appkey:'0WEB06U85YBSLJNL',
+      versionCode:'1.0.0',
+      channelID:'share',
+      delay:1000,
+      sessionDuration:30*60*1000,
+      isOversea:false,
+      needReportRqdEvent:false
+    });
+    beacon.onDirectUserAction('preview_page_view',{
+      'url':location.href,
+      'referrer':document.referrer,
+      'title':document.title,
+      'sandbox_id':'4b711ece25194a11b8643bf22ea59515'
+    });
+  }catch(e){}
+})();
+</script></head>
+<body>
+  <div id="app"></div>
+
+  <!-- 本地引入，保证完全离线（双击文件即可运行） -->
+  <script src="vue.global.prod.js?v=20260811cc"></script>
+  <script src="lunar.js?v=20260811cc"></script>
+  <script src="plantlib.js?v=20260811cc"></script>
+  <script src="app.js?v=20260811cc"></script>
+</body>
+</html>
