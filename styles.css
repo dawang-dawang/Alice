@@ -48,20 +48,21 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 }
 .sidebar::after { content: "🐾  🦴  ☁️"; position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 13px; letter-spacing: 6px; opacity: .35; pointer-events: none; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 16px; }
-.brand-logo { width: 46px; height: 46px; border-radius: 15px; background: linear-gradient(135deg, #fdf0e2, #f9e4cc); display: grid; place-items: center; box-shadow: 0 4px 14px rgba(178, 141, 100, .18); }
-.brand-logo svg { width: 34px; height: 34px; }
+.brand-logo { width: 46px; height: 46px; border-radius: 15px; background: linear-gradient(135deg, #ffeef4, #ffdce8); display: grid; place-items: center; box-shadow: 0 4px 14px rgba(224, 122, 153, .25); overflow: hidden; }
+.brand-logo img { width: 40px; height: 40px; object-fit: cover; }
 .brand-title { font-weight: 700; font-size: 15px; color: var(--green-deep); }
 .brand-sub { font-size: 11.5px; color: var(--text-mute); }
-.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-item {
-  display: flex; align-items: center; justify-content: center; padding: 6px; border: 0;
-  border-radius: var(--radius-sm); background: transparent; color: var(--text-soft);
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0;
+  border-radius: var(--radius-sm); background: #fffafc; color: #c2516e;
   transition: .15s;
 }
-.nav-item:hover { background: #fffafc; }
-.nav-item.active { background: linear-gradient(135deg, #ffe6ed, #ffd0e0); box-shadow: 0 4px 12px rgba(224, 122, 153, .25); }
-.nav-ico { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; }
-.nav-ico img { width: 56px; height: 56px; object-fit: cover; border-radius: 12px; }
+.nav-item:hover { background: #ffeef4; color: #e07a99; }
+.nav-item.active { background: linear-gradient(135deg, #ffe6ed, #ffd0e0); color: #d94f7c; box-shadow: 0 4px 12px rgba(224, 122, 153, .25); }
+.nav-ico { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.nav-ico img { width: 36px; height: 36px; object-fit: cover; border-radius: 8px; }
+.nav-name { font-size: 13px; font-weight: 600; }
 .badge { margin-left: auto; background: var(--qing); color: #c2516e; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 1px 8px; }
 .nav-item.active .badge { background: rgba(255,255,255,.65); color: #d96b8a; }
 .sidebar-foot { display: flex; flex-direction: column; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); margin-bottom: 30px; }
@@ -263,8 +264,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
   /* 侧边栏改为抽屉：默认收起，点头像展开 */
   .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; flex: none; transform: translateX(-100%); transition: transform .28s ease; z-index: 60; border-radius: 0 22px 22px 0; box-shadow: none; }
   .sidebar.open { transform: translateX(0); box-shadow: 0 12px 40px rgba(120, 90, 50, .28); }
-  .menu-btn { display: inline-flex; align-items: center; justify-content: center; position: fixed; z-index: 70; width: 40px; height: 40px; border-radius: 13px; border: 1px solid var(--border); background: rgba(253, 240, 226, .94); box-shadow: 0 3px 10px rgba(178, 141, 100, .25); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
-  .menu-btn svg { width: 29px; height: 29px; pointer-events: none; }
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; position: fixed; z-index: 70; width: 40px; height: 40px; border-radius: 13px; border: 1px solid #ffd9e2; background: rgba(255, 238, 244, .94); box-shadow: 0 3px 10px rgba(224, 122, 153, .3); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; overflow: hidden; }
+  .menu-btn img { width: 34px; height: 34px; pointer-events: none; object-fit: cover; }
   .menu-mask { display: block; position: fixed; inset: 0; background: rgba(120, 90, 50, .35); z-index: 50; }
   .cards-2, .cards-3 { grid-template-columns: 1fr; }
   .main { padding: 14px 16px 60px; }
