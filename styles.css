@@ -1,25 +1,25 @@
 :root {
-  --bg: #fdf8f1;
-  --panel: #fffdf9;
-  --panel-2: #fbf3e9;
-  --border: #f0e2d0;
-  --text: #5c4a3a;
-  --text-soft: #8a7563;
-  --text-mute: #b8a48f;
-  --green: #e8a87c;
-  --green-soft: #fdf0e2;
-  --green-deep: #c08457;
-  --green-pale: #f9e4cc;
-  --accent: #d9b98a;
-  --qing: #f6ead8;
-  --warn: #d9a05b;
-  --warn-soft: #fdf3e3;
-  --danger: #e08a80;
-  --danger-soft: #fbece9;
-  --shadow: 0 10px 30px rgba(178, 141, 100, .12);
-  --shadow-sm: 0 4px 14px rgba(178, 141, 100, .10);
-  --radius: 22px;
-  --radius-sm: 15px;
+  --bg: #fff5f8;
+  --panel: #fffafc;
+  --panel-2: #fff0f4;
+  --border: #ffd9e2;
+  --text: #6b4a5c;
+  --text-soft: #a88294;
+  --text-mute: #c4a4b3;
+  --green: #ffb6c8;
+  --green-soft: #fff0f5;
+  --green-deep: #e07a99;
+  --green-pale: #ffe6ed;
+  --accent: #ff8aa6;
+  --qing: #fff0f5;
+  --warn: #f0a868;
+  --warn-soft: #fff3e3;
+  --danger: #ff7d8c;
+  --danger-soft: #ffe6ea;
+  --shadow: 0 10px 30px rgba(224, 122, 153, .15);
+  --shadow-sm: 0 4px 14px rgba(224, 122, 153, .12);
+  --radius: 24px;
+  --radius-sm: 16px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
@@ -42,7 +42,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 
 /* 侧边栏 */
 .sidebar {
-  width: 230px; flex: 0 0 230px; background: linear-gradient(180deg, #fffaf3, #fdf3e4);
+  width: 250px; flex: 0 0 250px; background: linear-gradient(180deg, #fff5f8, #fff0f4);
   border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 18px 13px;
   position: relative;
 }
@@ -54,16 +54,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .brand-sub { font-size: 11.5px; color: var(--text-mute); }
 .nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .nav-item {
-  display: flex; align-items: center; gap: 11px; padding: 10px 12px; border: 0;
+  display: flex; align-items: center; justify-content: center; padding: 6px; border: 0;
   border-radius: var(--radius-sm); background: transparent; color: var(--text-soft);
-  font-size: 13.5px; text-align: left; transition: .15s;
+  transition: .15s;
 }
-.nav-item:hover { background: #fffdf9; color: var(--green-deep); }
-.nav-item.active { background: linear-gradient(135deg, #f6e3c8, #f2d5b0); color: #7a5a3c; font-weight: 600; box-shadow: 0 4px 12px rgba(178, 141, 100, .18); }
-.nav-ico { font-size: 16px; width: 22px; height: 22px; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
-.nav-ico svg { width: 19px; height: 19px; }
-.badge { margin-left: auto; background: var(--qing); color: #b08a5c; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 1px 8px; }
-.nav-item.active .badge { background: rgba(255,255,255,.55); color: #8a6a45; }
+.nav-item:hover { background: #fffafc; }
+.nav-item.active { background: linear-gradient(135deg, #ffe6ed, #ffd0e0); box-shadow: 0 4px 12px rgba(224, 122, 153, .25); }
+.nav-ico { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; }
+.nav-ico img { width: 56px; height: 56px; object-fit: cover; border-radius: 12px; }
+.badge { margin-left: auto; background: var(--qing); color: #c2516e; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 1px 8px; }
+.nav-item.active .badge { background: rgba(255,255,255,.65); color: #d96b8a; }
 .sidebar-foot { display: flex; flex-direction: column; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); margin-bottom: 30px; }
 .acc-box { background: var(--panel-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 7px; display: flex; flex-direction: column; gap: 6px; }
 .acc-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: #fffdf9; color: var(--green-deep); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: .15s; }
@@ -185,9 +185,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .dash-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(201, 152, 104, .18); }
 .dash-card h3 { font-size: 14px; color: var(--green-deep); margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
 .dash-card .go-hint { margin-left: auto; font-size: 11px; color: var(--text-mute); font-weight: 400; opacity: .8; }
-/* 模块/卡片标题前置 SVG 图标（emoji 字体缺失时仍正常显示） */
-.mt-ico { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; }
-.mt-ico svg { width: 100%; height: 100%; }
+/* 模块/卡片标题前置 PNG 图标（Hello Kitty 风） */
+.mt-ico { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; overflow: hidden; }
+.mt-ico img { width: 100%; height: 100%; object-fit: cover; }
 .dash-card .row2 { display: flex; gap: 10px; }
 .dash-card .mini { flex: 1; background: var(--panel-2); border-radius: var(--radius-sm); padding: 10px 12px; }
 .dash-card .mini .mv { font-size: 19px; font-weight: 700; color: var(--green-deep); }
