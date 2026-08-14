@@ -132,93 +132,22 @@ let toastTimer = null;
 const toastMsg = ref("");
 function showToast(m) { toastMsg.value = m; clearTimeout(toastTimer); toastTimer = setTimeout(() => (toastMsg.value = ""), 1800); }
 
-/* 首次进入写入示例数据 */
+/* 首次进入：全部从空开始，不做任何预置数据（用户手动录入） */
 function seedIfEmpty() {
   if (LS.get("seeded")) return;
-  state.tasks = [{ id: uid(), title: "示例：给阳台绿萝浇水", note: "土面发干就该浇了", due: todayStr(), priority: "普通", done: false, createdAt: Date.now() }];
-  state.memoCats = [{ id: uid(), name: "生活琐事" }, { id: uid(), name: "购物清单" }, { id: uid(), name: "居家技巧" }, { id: uid(), name: "学习笔记" }, { id: uid(), name: "账号备忘" }];
-  state.memos = [{ id: uid(), title: "周末采购", content: "牛奶、鸡蛋、垃圾袋", catId: state.memoCats[1].id, pinned: true, createdAt: Date.now() }];
-  state.plants = [{ id: uid(), name: "绿萝", emoji: "🌷", species: "Epipremnum", location: "客厅窗台", acquired: todayStr(), light: "散射光", waterInterval: 5, fertilizeInterval: 30, lastWater: todayStr(), lastFertilize: todayStr(), logs: [], note: "好养，别暴晒" }];
+  state.tasks = [];
+  state.memoCats = [];
+  state.memos = [];
+  state.plants = [];
   state.sportActs = SPORT_ACTS_BUILTIN.map((a) => ({ id: uid(), name: a.name, kcalPerMin: a.kcalPerMin, custom: false }));
   state.sport = [];
-  state.finance = [{ id: uid(), type: "income", amount: 12000, category: "工资", date: todayStr(), note: "月薪" }, { id: uid(), type: "expense", amount: 3200, category: "房租", date: todayStr(), note: "" }];
-  state.anniv = [{ id: uid(), name: "宝宝生日", date: "2025-08-11", type: "生日", repeat: true }];
-  state.babyProfile = { name: "小宝贝", birth: "2025-08-11" };
+  state.finance = [];
+  state.anniv = [];
+  state.babyProfile = {};
   state.baby = [];
   LS.set("seeded", true);
 }
 
-/* 载入演示数据：覆盖式填入一套完整示例，用于给别人演示（日期相对今天生成） */
-function seedDemo() {
-  const t = todayStr();
-  const d1 = addDays(t, 1), d2 = addDays(t, 3), dm = addDays(t, -1);
-  state.memoCats = [{ id: uid(), name: "生活琐事" }, { id: uid(), name: "购物清单" }, { id: uid(), name: "学习笔记" }, { id: uid(), name: "账号备忘" }];
-  state.tasks = [
-    { id: uid(), title: "给阳台绿萝浇水", short: "浇水", note: "土面发干就该浇了", due: t, priority: "普通", done: false, createdAt: Date.now() },
-    { id: uid(), title: "周三例会", short: "例会", note: "带上周报", due: t, priority: "紧急", done: false, createdAt: Date.now() },
-    { id: uid(), title: "买牛奶鸡蛋", short: "买牛奶", note: "", due: t, priority: "普通", done: true, createdAt: Date.now() },
-    { id: uid(), title: "预约牙医", short: "看牙医", note: "电话 0755-123456", due: d1, priority: "普通", done: false, createdAt: Date.now() },
-    { id: uid(), title: "交水电费", short: "交水电", note: "", due: dm, priority: "普通", done: false, createdAt: Date.now() },
-    { id: uid(), title: "宝宝体检", short: "体检", note: "记得带疫苗本", due: d2, priority: "紧急", done: false, createdAt: Date.now() },
-  ];
-  state.memos = [
-    { id: uid(), title: "周末采购", content: "牛奶、鸡蛋、垃圾袋、抽纸", catId: state.memoCats[1].id, pinned: true, createdAt: Date.now() },
-    { id: uid(), title: "WiFi 密码", content: "Life@2026，路由器背面也有", catId: state.memoCats[3].id, pinned: false, createdAt: Date.now() },
-    { id: uid(), title: "旅行清单", content: "充电宝、防晒霜、晕车药、一次性床单", catId: state.memoCats[0].id, pinned: false, createdAt: Date.now() },
-  ];
-  const y = t.slice(0, 4);
-  state.anniv = [
-    { id: uid(), name: "宝宝生日", date: y + "-08-12", type: "生日", repeat: true },
-    { id: uid(), name: "结婚纪念日", date: y + "-08-15", type: "纪念日", repeat: true },
-    { id: uid(), name: "周年纪念", date: y + "-09-01", type: "纪念日", repeat: true },
-  ];
-  state.finance = [
-    { id: uid(), type: "income", amount: 12000, category: "工资", date: t, note: "月薪" },
-    { id: uid(), type: "income", amount: 500, category: "兼职", date: addDays(t, -3), note: "" },
-    { id: uid(), type: "expense", amount: 3200, category: "房租", date: addDays(t, -2), note: "" },
-    { id: uid(), type: "expense", amount: 86, category: "餐饮", date: t, note: "午餐外卖" },
-    { id: uid(), type: "expense", amount: 45, category: "交通", date: t, note: "地铁" },
-    { id: uid(), type: "expense", amount: 199, category: "购物", date: addDays(t, -1), note: "日用品" },
-  ];
-  state.sportProfile = { sex: "男", height: 175, age: 30, weight: 68, bmr: 0 };
-  state.sportProfile.bmr = calcBmr(state.sportProfile.sex, state.sportProfile.height, state.sportProfile.age, state.sportProfile.weight);
-  state.sportActs = SPORT_ACTS_BUILTIN.map((a) => ({ id: uid(), name: a.name, kcalPerMin: a.kcalPerMin, custom: false }));
-  state.sport = [
-    { id: uid(), kind: "exercise", actId: state.sportActs[0].id, duration: 30, calories: 180, date: t },
-    { id: uid(), kind: "exercise", actId: state.sportActs[1].id, duration: 20, calories: 120, date: t },
-    { id: uid(), kind: "food", food: "米饭", meal: "午餐", grams: 200, calories: 232, date: t },
-    { id: uid(), kind: "food", food: "鸡胸肉", meal: "午餐", grams: 150, calories: 165, date: t },
-  ];
-  state.weights = [
-    { id: uid(), weight: 69.2, date: addDays(t, -14) },
-    { id: uid(), weight: 68.8, date: addDays(t, -7) },
-    { id: uid(), weight: 68.0, date: t },
-  ];
-  state.plants = [
-    { id: uid(), name: "绿萝", emoji: "🌿", species: "Epipremnum", location: "客厅窗台", city: "深圳", lightHours: "6", waterNeed: "适中", waterInterval: 5, fertilizeInterval: 30, light: "散射光", acquired: addDays(t, -20), img: "", lastWater: addDays(t, -6), lastFertilize: addDays(t, -15), logs: [], note: "好养，别暴晒" },
-    { id: uid(), name: "多肉", emoji: "🌵", species: "Echeveria", location: "卧室飘窗", city: "深圳", lightHours: "8", waterNeed: "耐旱", waterInterval: 15, fertilizeInterval: 45, light: "充足光照", acquired: addDays(t, -40), img: "", lastWater: addDays(t, -14), lastFertilize: addDays(t, -20), logs: [], note: "宁干勿湿" },
-    { id: uid(), name: "月季", emoji: "🌹", species: "Rosa", location: "阳台", city: "深圳", lightHours: "10", waterNeed: "喜湿", waterInterval: 3, fertilizeInterval: 15, light: "充足光照", acquired: addDays(t, -10), img: "", lastWater: addDays(t, -4), lastFertilize: addDays(t, -10), logs: [], note: "勤修剪" },
-  ];
-  state.babyProfile = { name: "小宝贝", birth: addDays(t, -180) };
-  /* 3 次儿保记录：出生 / 3 个月 / 6 个月，各含身高体重头围（datetime 用时间戳，与录入一致） */
-  const T = (ds, hh) => new Date(ds + "T" + hh).getTime();
-  state.baby = [
-    { id: uid(), type: "身高", value: "50", datetime: T(addDays(t, -180), "10:00"), note: "出生体检" },
-    { id: uid(), type: "体重", value: "3.3", datetime: T(addDays(t, -180), "10:00"), note: "出生体检" },
-    { id: uid(), type: "头围", value: "34", datetime: T(addDays(t, -180), "10:00"), note: "出生体检" },
-    { id: uid(), type: "身高", value: "61", datetime: T(addDays(t, -90), "10:00"), note: "3 月儿保" },
-    { id: uid(), type: "体重", value: "6.4", datetime: T(addDays(t, -90), "10:00"), note: "3 月儿保" },
-    { id: uid(), type: "头围", value: "40.5", datetime: T(addDays(t, -90), "10:00"), note: "3 月儿保" },
-    { id: uid(), type: "身高", value: "67", datetime: T(addDays(t, 0), "10:00"), note: "6 月儿保" },
-    { id: uid(), type: "体重", value: "7.9", datetime: T(addDays(t, 0), "10:00"), note: "6 月儿保" },
-    { id: uid(), type: "头围", value: "44", datetime: T(addDays(t, 0), "10:00"), note: "6 月儿保" },
-    { id: uid(), type: "疫苗", value: "", datetime: T(addDays(t, -10), "09:30"), note: "乙肝第二针" },
-  ];
-  state.moods = { [t]: "happy", [addDays(t, -1)]: "calm" };
-  state.brainBest = 18500;
-  syncPlanTasks();
-  saveAll();
-}
 
 /* 载入已有数据 */
 function loadAll() {
@@ -1988,7 +1917,6 @@ const App = {
       r.readAsText(f); e.target.value = "";
     }
     function triggerImport() { if (fileInput.value) fileInput.value.click(); }
-    function loadDemo() { seedDemo(); showToast("已载入演示数据 🎬"); }
 
     /* ---------- 账号登录 / 同步 ---------- */
     const authForm = reactive({ show: false, mode: "login", email: "", password: "", busy: false });
@@ -2026,7 +1954,7 @@ const App = {
     }
     function logout() { authLogout(); showToast("已退出登录"); }
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, DOG_SVG, fileInput, doExport, doImport, triggerImport, loadDemo, authState, authForm, pwForm, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
   },
   template: `
   <div class="app">
@@ -2058,7 +1986,6 @@ const App = {
             </div>
           </template>
         </div>
-        <button class="btn-ghost" @click="loadDemo">🎬 载入演示数据</button>
         <button class="btn-ghost" @click="doExport">⬇️ 导出备份</button>
         <button class="btn-ghost" @click="triggerImport">⬆️ 导入备份</button>
         <input ref="fileInput" type="file" accept="application/json" hidden @change="doImport">
