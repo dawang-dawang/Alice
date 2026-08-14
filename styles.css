@@ -65,8 +65,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .badge { margin-left: auto; background: var(--qing); color: #b08a5c; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 1px 8px; }
 .nav-item.active .badge { background: rgba(255,255,255,.55); color: #8a6a45; }
 .sidebar-foot { display: flex; flex-direction: column; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); margin-bottom: 30px; }
-.acc-box { background: var(--panel-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 9px; display: flex; flex-direction: column; gap: 7px; }
-.acc-title { font-size: 12.5px; font-weight: 700; color: var(--green-deep); }
+.acc-box { background: var(--panel-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 7px; display: flex; flex-direction: column; gap: 6px; }
+.acc-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: #fffdf9; color: var(--green-deep); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: .15s; }
+.acc-main:hover { background: var(--green-soft); }
+.acc-caret { font-size: 10px; color: var(--text-mute); }
 .acc-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .acc-btns .btn-ghost { flex: 1 1 44%; padding: 6px; font-size: 12px; }
 .acc-tip { font-size: 11px; color: var(--text-mute); margin-top: 10px; text-align: center; }
