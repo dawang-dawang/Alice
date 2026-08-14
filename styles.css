@@ -264,8 +264,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
   /* 侧边栏改为抽屉：默认收起，点头像展开 */
   .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; flex: none; transform: translateX(-100%); transition: transform .28s ease; z-index: 60; border-radius: 0 22px 22px 0; box-shadow: none; }
   .sidebar.open { transform: translateX(0); box-shadow: 0 12px 40px rgba(120, 90, 50, .28); }
-  .menu-btn { display: inline-flex; align-items: center; justify-content: center; position: fixed; z-index: 70; width: 40px; height: 40px; border-radius: 13px; border: 1px solid #ffd9e2; background: rgba(255, 238, 244, .94); box-shadow: 0 3px 10px rgba(224, 122, 153, .3); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; overflow: hidden; }
-  .menu-btn img { width: 34px; height: 34px; pointer-events: none; object-fit: cover; }
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; position: fixed; z-index: 70; width: 80px; height: 80px; border-radius: 0; border: none; background: transparent; box-shadow: none; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .menu-btn img { width: 76px; height: 76px; pointer-events: none; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(224, 122, 153, .35)); }
   .menu-mask { display: block; position: fixed; inset: 0; background: rgba(120, 90, 50, .35); z-index: 50; }
   .cards-2, .cards-3 { grid-template-columns: 1fr; }
   .main { padding: 14px 16px 60px; }
