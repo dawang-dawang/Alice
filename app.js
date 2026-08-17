@@ -43,6 +43,13 @@ function getLunar(date) {
     };
   } catch (e) { return { text: "", term: "" }; }
 }
+/* 农历 → 公历（纪念日按农历录入用），返回 "yyyy-mm-dd" */
+function lunarToSolar(y, m, d) {
+  try {
+    if (typeof Lunar === "undefined") return todayStr();
+    return Lunar.fromYmd(+y, +m, +d).getSolar().toYmd();
+  } catch (e) { return todayStr(); }
+}
 
 /* 线条小狗（马尔济斯）—— 奶油治愈主题吉祥物 */
 const DOG_SVG = '<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 62 C30 62 26 72 27 84 C28 98 38 106 60 106 C82 106 92 98 93 84 C94 72 90 62 82 62 C76 62 74 66 60 66 C46 66 44 62 38 62 Z" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M36 72 C26 66 20 64 17 70 C14 76 18 80 24 78" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><path d="M44 100 C43 106 46 109 50 109 C54 109 55 106 54 101" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><path d="M66 101 C65 106 66 109 70 109 C74 109 77 106 76 100" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><circle cx="60" cy="40" r="27" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5"/><path d="M35 30 C28 20 22 22 24 31 C25 37 30 41 36 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M85 30 C92 20 98 22 96 31 C95 37 90 41 84 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M34 44 C36 52 44 56 60 56 C76 56 84 52 86 44" fill="none" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><circle cx="51" cy="37" r="2.6" fill="#5C4636"/><circle cx="69" cy="37" r="2.6" fill="#5C4636"/><ellipse cx="60" cy="44" rx="3" ry="2.4" fill="#5C4636"/><path d="M60 46.4 V49 M56.5 48 C57.5 50.5 62.5 50.5 63.5 48" stroke="#5C4636" stroke-width="1.6" stroke-linecap="round"/><path d="M57.5 49.5 C57 52 63 52 62.5 49.5" fill="#F7C7CF"/><ellipse cx="44" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><ellipse cx="76" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><path d="M44 55 C48 60 72 60 76 55" stroke="#D9B98A" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
@@ -64,7 +71,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811cv", tasks: "icons/日程管理.png?v=20260811cv", memo: "icons/备忘录.png?v=20260811cv", anniv: "icons/纪念日.png?v=20260811cv", finance: "icons/理财管理.png?v=20260811cv", sport: "icons/减脂管理.png?v=20260811cv", plants: "icons/我的植物.png?v=20260811cv", baby: "icons/宝宝养育.png?v=20260811cv", express: "icons/表达能力.png?v=20260811cv", brain: "icons/前额叶训练.png?v=20260811cv" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811cz", tasks: "icons/日程管理.png?v=20260811cz", memo: "icons/备忘录.png?v=20260811cz", anniv: "icons/纪念日.png?v=20260811cz", finance: "icons/理财管理.png?v=20260811cz", sport: "icons/减脂管理.png?v=20260811cz", plants: "icons/我的植物.png?v=20260811cz", baby: "icons/宝宝养育.png?v=20260811cz", express: "icons/表达能力.png?v=20260811cz", brain: "icons/前额叶训练.png?v=20260811cz" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -100,11 +107,12 @@ function svgLine(series, colors, xLabel) {
   Object.keys(series).forEach((k) => {
     const arr = series[k]; if (!arr.length) return;
     const d = arr.map((p, i) => (i ? "L" : "M") + sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1)).join(" ");
-    const c = colors[k] || "#5fa98a";
-    paths += '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2.5"></path>';
-    arr.forEach((p) => { paths += '<circle cx="' + sx(p.x).toFixed(1) + '" cy="' + sy(p.y).toFixed(1) + '" r="3.3" fill="' + c + '"></circle>'; });
+    let c = colors[k] || "#5fa98a"; let dash = ""; let noDot = false;
+    if (typeof c === "string") { const parts = c.split("|"); if (parts.length > 1) { c = parts[0]; dash = parts[1]; noDot = true; } }
+    paths += '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2.5"' + (dash ? ' stroke-dasharray="' + dash + '"' : "") + "></path>";
+    if (!noDot) arr.forEach((p) => { paths += '<circle cx="' + sx(p.x).toFixed(1) + '" cy="' + sy(p.y).toFixed(1) + '" r="3.3" fill="' + c + '"></circle>'; });
   });
-  const lg = Object.keys(series).map((k) => '<span><i class="dot" style="background:' + colors[k] + '"></i>' + k + "</span>").join("");
+  const lg = Object.keys(series).map((k) => { const c0 = (colors[k] || "#5fa98a").split("|")[0]; return '<span><i class="dot" style="background:' + c0 + '"></i>' + k + "</span>"; }).join("");
   const xl = xLabel ? '<text x="' + (W - padR) + '" y="' + (H - 6) + '" font-size="10" fill="#a2b1aa" text-anchor="end">' + xLabel + "</text>" : "";
   return '<svg width="100%" viewBox="0 0 ' + W + " " + H + '">' + grid + paths + xl + '</svg><div class="legend">' + lg + "</div>";
 }
@@ -327,13 +335,26 @@ const Dashboard = {
       return { ...a, days: dayDiff(fmtDate(d), todayStr()) };
     }).sort((x, y) => x.days - y.days).slice(0, 3));
 
-    /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致） */
+    /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
     function babyMonthsAt(ts) { if (!state.babyProfile.birth) return 0; return Math.floor(dayDiff(fmtDate(ts), state.babyProfile.birth) / 30.44); }
     const growthChart = computed(() => {
       const ser = { 体重: [], 身高: [], 头围: [] };
       state.baby.forEach((r) => { if (["体重", "身高", "头围"].includes(r.type) && r.value !== "" && !isNaN(+r.value)) ser[r.type].push({ x: babyMonthsAt(r.datetime), y: +r.value }); });
       Object.keys(ser).forEach((k) => ser[k].sort((a, b) => a.x - b.x));
-      return Object.values(ser).some((a) => a.length >= 2) ? svgLine(ser, { 体重: "#5fa98a", 身高: "#7fa8d9", 头围: "#d99a4e" }, "月龄") : "";
+      const hasBirth = !!state.babyProfile.birth;
+      const sex = state.babyProfile.sex === "女" ? "f" : "m";
+      let maxMo = 60;
+      Object.values(ser).forEach((a) => a.forEach((p) => { if (p.x > maxMo) maxMo = p.x; }));
+      if (maxMo < 36) maxMo = 36;
+      const out = {}; const outC = {};
+      const GCO = { 体重: "#5fa98a", 身高: "#7fa8d9", 头围: "#d99a4e" };
+      const KEYM = { 体重: "weight", 身高: "height", 头围: "head" };
+      Object.keys(ser).forEach((k) => {
+        if (ser[k].length) { out[k] = ser[k]; outC[k] = GCO[k]; }
+        if (hasBirth) { const ref = []; for (let m = 0; m <= maxMo; m += 3) ref.push({ x: m, y: Math.round(growthRef(KEYM[k], sex, m) * 10) / 10 }); out[k + " P50"] = ref; outC[k + " P50"] = GCO[k] + "|4 3"; }
+      });
+      const any = Object.values(ser).some((a) => a.length >= 2) || (hasBirth && Object.keys(ser).length > 0);
+      return any ? svgLine(out, outC, "月龄") : "";
     });
 
     return { now, slogan, hintShow, lunar, week, dateText, tasksActive, tasksToday, tasksOverdue, plantsTotal, plantsNeed, sportToday, finMonth, annivNear, growthChart, iconSvg, DOG_SVG };
@@ -632,10 +653,8 @@ const Memo = {
       <div class="field"><label>标题</label><input class="input" v-model="form.name"></div>
       <div class="field"><label>分类</label><select class="select" v-model="form.catId"><option value="">未分类</option><option v-for="c in state.memoCats" :key="c.id" :value="c.id">{{c.name}}</option></select></div>
       <div class="field"><label>内容</label><textarea class="textarea" style="min-height:120px" v-model="form.content"></textarea></div>
-      <div class="row">
-        <div class="field"><label>日期（可选）</label><input class="input" type="date" v-model="form.due"></div>
-        <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--text-soft)"><input type="checkbox" v-model="form.syncTask" style="width:15px;height:15px;accent-color:var(--green)"> 同步到日程管理</label><div class="hint" style="margin-top:6px">勾选并设置日期后，会自动生成一条待办显示在日程管理日历里。</div></div>
-      </div>
+      <div class="field"><label>日期（可选）</label><input class="input" type="date" v-model="form.due" style="max-width:240px"></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--text-soft)"><input type="checkbox" v-model="form.syncTask" style="width:15px;height:15px;accent-color:var(--green)"> 同步到日程管理</label><div class="hint" style="margin-top:6px">勾选并设置日期后，会自动生成一条待办显示在日程管理日历里。</div></div>
       <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--text-soft)"><input type="checkbox" v-model="form.pinned" style="width:15px;height:15px;accent-color:var(--green)"> 置顶</label></div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
@@ -1027,6 +1046,21 @@ const FOODS = [
   { n: "例汤", k: 40 }, { n: "紫菜蛋花汤", k: 25 }, { n: "番茄牛腩汤", k: 80 }, { n: "重庆小面", k: 220 }, { n: "兰州拉面", k: 150 },
   { n: "黄焖鸡米饭", k: 190 }, { n: "麻辣烫", k: 140 }, { n: "火锅（人均）", k: 350 }, { n: "烧烤（人均）", k: 300 }, { n: "关东煮", k: 90 },
   { n: "寿司卷", k: 160 }, { n: "饭团", k: 180 }, { n: "三明治", k: 250 }, { n: "吐司", k: 283 }, { n: "玉米片", k: 500 },
+  // 沙县小吃 & 中式小吃面点（估算）
+  { n: "沙县鸡腿饭", k: 550 }, { n: "沙县蒸饺", k: 250 }, { n: "沙县拌面", k: 320 }, { n: "沙县馄饨", k: 220 }, { n: "沙县炖汤", k: 120 },
+  { n: "沙县鸭腿饭", k: 520 }, { n: "沙县飘香拌面", k: 350 }, { n: "沙县炸酱面", k: 300 },
+  { n: "酱香饼", k: 320 }, { n: "手抓饼", k: 350 }, { n: "鸡蛋灌饼", k: 340 }, { n: "烤冷面", k: 300 }, { n: "杂粮煎饼", k: 230 },
+  { n: "肉夹馍", k: 340 }, { n: "凉皮", k: 130 }, { n: "酸辣粉", k: 180 }, { n: "螺蛳粉", k: 300 }, { n: "热干面", k: 280 },
+  { n: "炸酱面", k: 300 }, { n: "葱油拌面", k: 330 }, { n: "阳春面", k: 150 }, { n: "担担面", k: 290 }, { n: "刀削面", k: 190 },
+  { n: "牛肉面", k: 220 }, { n: "过桥米线", k: 260 }, { n: "砂锅米线", k: 280 }, { n: "桂林米粉", k: 230 }, { n: "湖南米粉", k: 240 },
+  { n: "煲仔饭", k: 450 }, { n: "卤肉饭", k: 420 }, { n: "猪脚饭", k: 460 }, { n: "叉烧饭", k: 480 }, { n: "烧鹅饭", k: 500 },
+  { n: "白切鸡饭", k: 420 }, { n: "海南鸡饭", k: 430 }, { n: "梅菜扣肉", k: 480 }, { n: "粉蒸肉", k: 430 }, { n: "小炒黄牛肉", k: 220 },
+  { n: "辣椒炒肉", k: 240 }, { n: "青椒肉丝", k: 190 }, { n: "木须肉", k: 180 }, { n: "京酱肉丝", k: 230 }, { n: "锅包肉", k: 330 },
+  { n: "干煸四季豆", k: 160 }, { n: "地三鲜", k: 200 }, { n: "虎皮青椒", k: 130 }, { n: "蒜蓉粉丝虾", k: 160 }, { n: "水煮鱼", k: 220 },
+  { n: "酸菜鱼", k: 200 }, { n: "剁椒鱼头", k: 200 }, { n: "毛血旺", k: 250 }, { n: "辣子鸡", k: 330 }, { n: "大盘鸡", k: 280 },
+  { n: "手撕包菜", k: 90 }, { n: "干锅花菜", k: 160 }, { n: "铁板豆腐", k: 180 }, { n: "炸臭豆腐", k: 250 }, { n: "北京烤鸭", k: 350 },
+  { n: "糯米鸡", k: 300 }, { n: "肠粉", k: 150 }, { n: "虾饺", k: 160 }, { n: "烧卖", k: 220 }, { n: "豉汁凤爪", k: 200 },
+  { n: "蛋挞", k: 230 }, { n: "珍珠奶茶", k: 180 }, { n: "芋圆", k: 220 }, { n: "双皮奶", k: 160 },
 ];
 /* 基础代谢（Mifflin-St Jeor）：男 +5，女 −161 */
 function calcBmr(sex, height, age, weight) {
@@ -1172,7 +1206,7 @@ const Sport = {
         <div class="field"><label>时长(分钟)</label><input class="input" type="number" min="1" v-model="form.duration" @input="syncCal"></div>
         <div class="field"><label>消耗热量(kcal)</label><input class="input" type="number" min="0" v-model="form.calories"></div>
       </div>
-      <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div>
+      <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date" style="max-width:240px"></div>
       <div style="font-size:12px;color:var(--text-mute);margin:-4px 0 8px">热量 = 项目单位消耗 × 时长，自动估算，可改。</div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
@@ -1202,7 +1236,7 @@ const Sport = {
         <div class="field"><label>每100g热量(kcal)</label><input class="input" type="number" min="0" v-model="food.kcal100" @input="foodCal"></div>
         <div class="field"><label>分量(克)</label><input class="input" type="number" min="1" v-model="food.grams" @input="foodCal"></div>
       </div>
-      <div class="row"><div class="field"><label>摄入热量(kcal)</label><input class="input" type="number" min="0" v-model="food.calories"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="food.date"></div></div>
+      <div class="pl-grid"><div class="field"><label>摄入热量(kcal)</label><input class="input" type="number" min="0" v-model="food.calories"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="food.date"></div></div>
       <div style="font-size:12px;color:var(--text-mute);margin:-4px 0 8px">点搜索结果自动填名称和每100g热量，再按「分量 × 每100g」算总热量，可手动改。</div>
       <div style="text-align:right"><button class="btn" @click="saveFood">保存</button></div>
     </modal>
@@ -1304,8 +1338,12 @@ const Finance = {
     </div>
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
-      <div class="row"><div class="field"><label>金额</label><input class="input" type="number" step="0.01" v-model="form.amount"></div><div class="field"><label>分类</label><select class="select" v-model="form.category"><option v-for="c in cats()" :key="c" :value="c">{{c}}</option></select></div></div>
-      <div class="row"><div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div><div class="field"><label>备注</label><input class="input" v-model="form.note"></div></div>
+      <div class="pl-grid">
+        <div class="field"><label>金额</label><input class="input" type="number" step="0.01" v-model="form.amount"></div>
+        <div class="field"><label>分类</label><select class="select" v-model="form.category"><option v-for="c in cats()" :key="c" :value="c">{{c}}</option></select></div>
+        <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div>
+        <div class="field"><label>备注</label><input class="input" v-model="form.note"></div>
+      </div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
   </div>`,
@@ -1317,13 +1355,23 @@ const Finance = {
 const Anniv = {
   components: { Modal },
   setup() {
-    const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true });
+    const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 });
+    const lunarYears = (() => { const a = []; for (let y = 1995; y <= 2035; y++) a.push(y); return a; })();
     const list = computed(() => state.anniv.map((a) => { let d = new Date(a.date); const t = new Date(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); return { ...a, days: dayDiff(fmtDate(d), todayStr()) }; }).sort((x, y) => x.days - y.days));
-    function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true }); }
-    function openEdit(a) { Object.assign(form, { show: true, title: "编辑纪念日", id: a.id, name: a.name, date: a.date, type: a.type, repeat: a.repeat }); }
-    function save() { if (!form.name.trim()) return showToast("填名称"); if (form.id) { const a = state.anniv.find((x) => x.id === form.id); Object.assign(a, { name: form.name.trim(), date: form.date, type: form.type, repeat: form.repeat }); } else state.anniv.push({ id: uid(), name: form.name.trim(), date: form.date, type: form.type, repeat: form.repeat }); form.show = false; syncPlanTasks(); showToast("已添加，并同步到日程管理"); }
+    function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 }); }
+    function openEdit(a) {
+      Object.assign(form, { show: true, title: "编辑纪念日", id: a.id, name: a.name, date: a.date, type: a.type, repeat: a.repeat, lunar: !!a.lunar, ly: (a.lunar && a.lunar.y) || new Date().getFullYear(), lm: (a.lunar && a.lunar.m) || 8, ld: (a.lunar && a.lunar.d) || 15 });
+    }
+    function save() {
+      if (!form.name.trim()) return showToast("填名称");
+      const date = form.lunar ? lunarToSolar(form.ly, form.lm, form.ld) : form.date;
+      const lunar = form.lunar ? { y: +form.ly, m: +form.lm, d: +form.ld } : null;
+      if (form.id) { const a = state.anniv.find((x) => x.id === form.id); Object.assign(a, { name: form.name.trim(), date, type: form.type, repeat: form.repeat, lunar }); }
+      else state.anniv.push({ id: uid(), name: form.name.trim(), date, type: form.type, repeat: form.repeat, lunar });
+      form.show = false; syncPlanTasks(); showToast("已添加，并同步到日程管理");
+    }
     function del(id) { state.anniv = state.anniv.filter((x) => x.id !== id); syncPlanTasks(); showToast("已删除"); }
-    return { form, list, openAdd, openEdit, save, del };
+    return { form, list, lunarYears, openAdd, openEdit, save, del };
   },
   template: `
   <div>
@@ -1337,7 +1385,7 @@ const Anniv = {
           <div style="font-weight:700;font-size:15.5px">{{a.name}}</div>
           <span class="tag" :class="a.days<=7?(a.days===0?'red':'warn'):'gray'">{{a.days===0?'就是今天！🎈':a.days+' 天后'}}</span>
         </div>
-        <div class="meta" style="margin-top:8px"><span class="tag blue">{{a.type}}</span><span>📅 {{a.date}}{{a.repeat?'（每年）':''}}</span></div>
+        <div class="meta" style="margin-top:8px"><span class="tag blue">{{a.type}}</span><span>📅 {{a.date}}<span v-if="a.lunar" style="color:var(--text-soft)">（农历{{a.lunar.m}}月{{a.lunar.d}}日）</span>{{a.repeat?'（每年）':''}}</span></div>
         <div style="display:flex;gap:8px;margin-top:12px"><button class="icon-btn" @click="openEdit(a)" title="编辑">✏️</button><button class="icon-btn danger" @click="del(a.id)" title="删除">🗑️</button></div>
       </div>
       <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🎂</span>还没有纪念日</div>
@@ -1345,7 +1393,22 @@ const Anniv = {
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
       <div class="field"><label>名称</label><input class="input" v-model="form.name"></div>
-      <div class="row"><div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div><div class="field"><label>类型</label><select class="select" v-model="form.type"><option>生日</option><option>纪念日</option><option>节日</option><option>证件到期日</option><option>其他</option></select></div></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="chip" :class="{active:!form.lunar}" @click="form.lunar=false">公历</button>
+        <button class="chip" :class="{active:form.lunar}" @click="form.lunar=true">农历</button>
+      </div>
+      <div v-if="!form.lunar" class="row">
+        <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div>
+        <div class="field"><label>类型</label><select class="select" v-model="form.type"><option>生日</option><option>纪念日</option><option>节日</option><option>证件到期日</option><option>其他</option></select></div>
+      </div>
+      <div v-else>
+        <div class="row">
+          <div class="field"><label>农历年</label><select class="select" v-model="form.ly"><option v-for="y in lunarYears" :key="y" :value="y">{{y}}年</option></select></div>
+          <div class="field"><label>农历月</label><select class="select" v-model="form.lm"><option v-for="m in 12" :key="m" :value="m">{{m}}月</option></select></div>
+          <div class="field"><label>农历日</label><select class="select" v-model="form.ld"><option v-for="d in 30" :key="d" :value="d">{{d}}日</option></select></div>
+        </div>
+        <div class="hint" style="margin:-2px 0 4px">自动换算为公历保存，每年重复按公历提醒；农历日期按所选年份换算。</div>
+      </div>
       <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--text-soft)"><input type="checkbox" v-model="form.repeat" style="width:15px;height:15px;accent-color:var(--green)"> 每年重复</label></div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
@@ -1355,13 +1418,35 @@ const Anniv = {
 /* =========================================================
    组件：宝宝养育
    ========================================================= */
+/* 最新国标《7 岁以下儿童生长标准》WS/T 423-2022 中位数（P50），0-60 月，分性别 m=男 f=女 */
 const GROWTH = {
-  weight: { 0: 3.3, 1: 4.5, 2: 5.6, 3: 6.4, 4: 7.0, 5: 7.5, 6: 7.9, 7: 8.3, 8: 8.6, 9: 8.9, 10: 9.2, 11: 9.4, 12: 9.6, 15: 10.3, 18: 10.9, 21: 11.4, 24: 12.0, 30: 13.3, 36: 14.3 },
-  height: { 0: 50, 1: 54, 2: 58, 3: 61, 4: 63, 5: 65, 6: 67, 7: 68, 8: 70, 9: 71, 10: 72, 11: 73, 12: 75, 15: 80, 18: 83, 21: 86, 24: 88, 30: 93, 36: 97 },
-  head: { 0: 34, 1: 37, 2: 39, 3: 40.5, 4: 42, 5: 43, 6: 44, 7: 45, 8: 45.5, 9: 46, 10: 46.5, 11: 47, 12: 47, 15: 47.5, 18: 48, 24: 49, 36: 50 },
+  weight: {
+    m: { 0: 3.32, 1: 4.51, 2: 5.68, 3: 6.64, 4: 7.44, 5: 8.11, 6: 8.67, 7: 9.14, 8: 9.54, 9: 9.90, 10: 10.23, 11: 10.53, 12: 10.80, 15: 11.53, 18: 12.20, 21: 12.82, 24: 13.38, 27: 13.92, 30: 14.43, 33: 14.92, 36: 15.38, 42: 16.30, 48: 17.21, 54: 18.13, 60: 19.05 },
+    f: { 0: 3.24, 1: 4.24, 2: 5.27, 3: 6.12, 4: 6.83, 5: 7.43, 6: 7.94, 7: 8.38, 8: 8.77, 9: 9.11, 10: 9.42, 11: 9.71, 12: 9.98, 15: 10.68, 18: 11.30, 21: 11.88, 24: 12.41, 27: 12.91, 30: 13.38, 33: 13.84, 36: 14.28, 42: 15.13, 48: 15.98, 54: 16.86, 60: 17.75 },
+  },
+  height: {
+    m: { 0: 49.9, 1: 54.7, 2: 58.4, 3: 61.4, 4: 63.9, 5: 66.0, 6: 67.8, 7: 69.5, 8: 71.0, 9: 72.4, 10: 73.7, 11: 74.9, 12: 76.1, 15: 79.1, 18: 82.0, 21: 84.7, 24: 87.2, 27: 89.5, 30: 91.6, 33: 93.6, 36: 95.4, 42: 99.0, 48: 102.6, 54: 105.9, 60: 109.1 },
+    f: { 0: 49.2, 1: 53.7, 2: 57.1, 3: 59.8, 4: 62.1, 5: 64.1, 6: 65.7, 7: 67.3, 8: 68.7, 9: 70.1, 10: 71.3, 11: 72.5, 12: 73.7, 15: 77.2, 18: 80.3, 21: 83.2, 24: 85.7, 27: 88.0, 30: 90.1, 33: 92.0, 36: 93.9, 42: 97.6, 48: 101.2, 54: 104.5, 60: 107.7 },
+  },
+  head: {
+    m: { 0: 34.5, 1: 37.3, 2: 39.2, 3: 40.7, 4: 41.8, 5: 42.7, 6: 43.5, 7: 44.1, 8: 44.6, 9: 45.0, 10: 45.4, 11: 45.7, 12: 46.0, 15: 46.6, 18: 47.1, 21: 47.4, 24: 47.7, 27: 48.0, 30: 48.2, 33: 48.4, 36: 48.6, 42: 48.9, 48: 49.2, 54: 49.5, 60: 49.7 },
+    f: { 0: 33.9, 1: 36.5, 2: 38.3, 3: 39.7, 4: 40.8, 5: 41.7, 6: 42.4, 7: 43.0, 8: 43.5, 9: 44.0, 10: 44.3, 11: 44.7, 12: 45.0, 15: 45.6, 18: 46.1, 21: 46.5, 24: 46.8, 27: 47.1, 30: 47.4, 33: 47.6, 36: 47.8, 42: 48.2, 48: 48.5, 54: 48.8, 60: 49.1 },
+  },
 };
-function median(key, months) { const t = GROWTH[key]; const ks = Object.keys(t).map(Number).sort((a, b) => a - b); if (months <= ks[0]) return t[ks[0]]; if (months >= ks[ks.length - 1]) return t[ks[ks.length - 1]]; let lo = ks[0], hi = ks[ks.length - 1]; for (let i = 0; i < ks.length - 1; i++) { if (months >= ks[i] && months <= ks[i + 1]) { lo = ks[i]; hi = ks[i + 1]; break; } } const r = (months - lo) / (hi - lo); return t[lo] + (t[hi] - t[lo]) * r; }
-function growthFlag(key, months, val) { const m = median(key, months); if (val < m * 0.85) return "偏低"; if (val > m * 1.15) return "偏高"; return "正常"; }
+/* 国标 P50 插值：sex = "m"|"f" */
+function growthRef(key, sex, months) {
+  const t = (GROWTH[key] || {})[sex === "女" || sex === "f" ? "f" : "m"] || GROWTH[key].m || {};
+  const ks = Object.keys(t).map(Number).sort((a, b) => a - b);
+  if (!ks.length) return 0;
+  if (months <= ks[0]) return t[ks[0]];
+  if (months >= ks[ks.length - 1]) return t[ks[ks.length - 1]];
+  for (let i = 0; i < ks.length - 1; i++) { if (months >= ks[i] && months <= ks[i + 1]) { const r = (months - ks[i]) / (ks[i + 1] - ks[i]); return t[ks[i]] + (t[ks[i + 1]] - t[ks[i]]) * r; } }
+  return t[ks[ks.length - 1]];
+}
+/* 兼容旧调用：默认按男童 */
+function median(key, months) { return growthRef(key, "m", months); }
+/* 成长评估：sex 可传 "男"/"女"/"m"/"f"，缺省按男童 */
+function growthFlag(key, months, val, sex) { const m = growthRef(key, sex, months); if (val < m * 0.85) return "偏低"; if (val > m * 1.15) return "偏高"; return "正常"; }
 
 function babyAge(birth) { if (!birth) return null; const diff = dayDiff(todayStr(), birth); const months = Math.floor(diff / 30.44); const y = Math.floor(months / 12); const m = months % 12; return { months, text: y > 0 ? y + "岁" + (m ? m + "个月" : "") : months + "个月" }; }
 function foodRec(months) {
@@ -1387,31 +1472,45 @@ function eduRec(months) {
 const Baby = {
   components: { Modal },
   setup() {
-    const prof = reactive({ show: false, name: "", birth: "" });
+    const prof = reactive({ show: false, name: "", birth: "", sex: "男" });
     const form = reactive({ show: false, dt: "", h: "", w: "", hc: "", vax: "", note: "" });
     const TYPES = ["身高", "体重", "头围", "疫苗", "备注"];
     const UNIT = { 身高: "cm", 体重: "kg", 头围: "cm", 疫苗: "", 备注: "" };
+    const G_COLORS = { 体重: "#5fa98a", 身高: "#7fa8d9", 头围: "#d99a4e" };
+    const KEY_OF = { 体重: "weight", 身高: "height", 头围: "head" };
 
     const age = computed(() => babyAge(state.babyProfile.birth));
     const rec = computed(() => foodRec(age.value ? age.value.months : null));
     const edu = computed(() => eduRec(age.value ? age.value.months : null));
+    const sex = computed(() => (state.babyProfile.sex === "女" ? "f" : "m"));
 
     function toLocal(ts) { const d = new Date(ts); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
-    function openProf() { Object.assign(prof, state.babyProfile); prof.show = true; }
-    function saveProf() { state.babyProfile.name = prof.name.trim() || "宝宝"; state.babyProfile.birth = prof.birth; prof.show = false; showToast("已保存"); }
+    function openProf() { Object.assign(prof, { show: true, name: state.babyProfile.name || "", birth: state.babyProfile.birth || "", sex: state.babyProfile.sex || "男" }); }
+    function saveProf() { state.babyProfile.name = prof.name.trim() || "宝宝"; state.babyProfile.birth = prof.birth; state.babyProfile.sex = prof.sex; prof.show = false; showToast("已保存"); }
     function del(id) { state.baby = state.baby.filter((x) => x.id !== id); }
 
     function ageMonthsAt(ts) { if (!state.babyProfile.birth) return 0; return Math.floor(dayDiff(fmtDate(ts), state.babyProfile.birth) / 30.44); }
+    /* 成长曲线：用户数据 + 最新国标 P50 中位虚线（默认显示，无需先有记录） */
     const growthLine = computed(() => {
       const ser = { 体重: [], 身高: [], 头围: [] };
       state.baby.forEach((r) => { if (["体重", "身高", "头围"].includes(r.type) && r.value !== "" && !isNaN(+r.value)) ser[r.type].push({ x: ageMonthsAt(r.datetime), y: +r.value }); });
       Object.keys(ser).forEach((k) => ser[k].sort((a, b) => a.x - b.x));
-      return Object.values(ser).some((a) => a.length >= 2) ? svgLine(ser, { 体重: "#5fa98a", 身高: "#7fa8d9", 头围: "#d99a4e" }, "月龄") : "";
+      const hasBirth = !!state.babyProfile.birth;
+      let maxMo = 60;
+      Object.values(ser).forEach((a) => a.forEach((p) => { if (p.x > maxMo) maxMo = p.x; }));
+      if (maxMo < 36) maxMo = 36;
+      const out = {}; const outC = {};
+      Object.keys(ser).forEach((k) => {
+        if (ser[k].length) { out[k] = ser[k]; outC[k] = G_COLORS[k]; }
+        if (hasBirth) { const ref = []; for (let m = 0; m <= maxMo; m += 3) ref.push({ x: m, y: Math.round(growthRef(KEY_OF[k], sex.value, m) * 10) / 10 }); out[k + " P50"] = ref; outC[k + " P50"] = G_COLORS[k] + "|4 3"; }
+      });
+      const any = Object.values(ser).some((a) => a.length >= 2) || (hasBirth && Object.keys(ser).length > 0);
+      return any ? svgLine(out, outC, "月龄") : "";
     });
-    /* 单条记录成长评估（身高/体重/头围 → 按月龄对照中位值） */
-    function flagOf(r) { if (!["身高", "体重", "头围"].includes(r.type) || r.value === "") return "—"; return growthFlag(r.type === "体重" ? "weight" : r.type === "身高" ? "height" : "head", ageMonthsAt(r.datetime), +r.value); }
+    /* 单条记录成长评估（身高/体重/头围 → 按月龄对照国标 P50） */
+    function flagOf(r) { if (!["身高", "体重", "头围"].includes(r.type) || r.value === "") return "—"; return growthFlag(KEY_OF[r.type], ageMonthsAt(r.datetime), +r.value, sex.value); }
     /* 全部成长数据逐条评估（按时间倒序） */
-    const evals = computed(() => state.baby.filter((x) => ["身高", "体重", "头围"].includes(x.type) && x.value !== "").map((r) => { const mo = ageMonthsAt(r.datetime); return { ...r, mo, flag: growthFlag(r.type === "体重" ? "weight" : r.type === "身高" ? "height" : "head", mo, +r.value) }; }).sort((a, b) => b.datetime - a.datetime));
+    const evals = computed(() => state.baby.filter((x) => ["身高", "体重", "头围"].includes(x.type) && x.value !== "").map((r) => { const mo = ageMonthsAt(r.datetime); return { ...r, mo, flag: growthFlag(KEY_OF[r.type], mo, +r.value, sex.value) }; }).sort((a, b) => b.datetime - a.datetime));
     /* 成长评估：固定显示约 3 条高度，侧边滚动条拉动看全部 */
     /* 养育时间线（按时间分组：同一时间的记录合并一行，按时间倒序） */
     const timeline = computed(() => {
@@ -1475,9 +1574,9 @@ const Baby = {
     </div>
 
     <div class="chart-wrap" style="margin-bottom:14px">
-      <div style="font-weight:700;margin-bottom:10px">📈 成长曲线（按月龄）</div>
+      <div style="font-weight:700;margin-bottom:10px">📈 成长曲线（按月龄）<span class="tag qing" v-if="state.babyProfile.birth">{{state.babyProfile.sex||'男'}}宝宝 · 国标P50参考</span></div>
       <div v-if="growthLine" v-html="growthLine"></div>
-      <div v-else class="empty"><span class="big">📏</span>记录 2 条以上身高/体重/头围后生成曲线</div>
+      <div v-else class="empty"><span class="big">📏</span>先在「宝宝信息」填出生日期，即显示最新国标 P50 中位参考线；记录身高/体重/头围后生成实际曲线</div>
     </div>
 
     <div class="card">
@@ -1500,8 +1599,12 @@ const Baby = {
     </div>
 
     <modal :show="prof.show" :title="'宝宝信息'" @close="prof.show=false">
-      <div class="field"><label>宝宝称呼</label><input class="input" v-model="prof.name"></div>
+      <div class="row">
+        <div class="field"><label>宝宝称呼</label><input class="input" v-model="prof.name"></div>
+        <div class="field"><label>性别</label><select class="select" v-model="prof.sex"><option>男</option><option>女</option></select></div>
+      </div>
       <div class="field"><label>出生日期</label><input class="input" type="date" v-model="prof.birth"></div>
+      <div class="hint">💡 性别用于对照最新国标《7 岁以下儿童生长标准》对应 P50 曲线与评估。</div>
       <div style="text-align:right"><button class="btn" @click="saveProf">保存</button></div>
     </modal>
 

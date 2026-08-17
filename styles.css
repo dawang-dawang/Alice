@@ -260,6 +260,17 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .tip-text { font-size: 15.5px; color: #7a5313; line-height: 1.8; font-weight: 600; }
 .tip-foot { font-size: 11.5px; color: #c4a668; margin-top: 8px; text-align: right; }
 
+/* 表单统一适配：日期/时间框在窄列不溢出、不重叠、高度统一 */
+.row > .field { min-width: 0; }
+.row .input, .row .select { width: 100%; min-width: 0; max-width: 100%; }
+.input[type="date"], .input[type="datetime-local"] { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.input[type="datetime-local"] { max-width: 280px; }
+@media (max-width: 900px) {
+  .row { flex-wrap: wrap; }
+  .row > .field { flex: 1 1 46%; min-width: 0; }
+  .row .input, .row .select, .pl-grid .input, .pl-grid .select { width: 100%; min-width: 0; }
+}
+
 /* 移动端抽屉菜单按钮 + 遮罩（桌面端隐藏） */
 .menu-btn { display: none; }
 .menu-mask { display: none; }
