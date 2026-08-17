@@ -881,7 +881,7 @@ const Plants = {
           <input class="input" v-model="lib.kw" placeholder="输入植物名，如：绿萝 / 龟背竹" @keyup.enter="searchPlant">
           <button class="btn sm" @click="searchPlant">{{search.loading?'…在线搜':'在线搜'}}</button>
         </div>
-        <div v-if="libList.length || search.results.length" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto">
+        <div v-if="libList.length || search.results.length" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto">
           <div v-for="lp in libList" :key="'lib'+lp.id" @click="pickLib(lp)" style="display:flex;gap:8px;align-items:center;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:6px 8px;cursor:pointer">
             <div style="width:38px;height:38px;border-radius:8px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(135deg,#fdf3e4,#f7e8d0);display:grid;place-items:center;font-size:18px">
               <img :src="'https://3ab55124cc754bb4be8f920a6bfb423d.app.codebuddy.work/images/'+lp.id+'.png'" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0" @error="$event.target.style.display='none'" alt="">
