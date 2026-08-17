@@ -42,8 +42,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 
 /* 侧边栏 */
 .sidebar {
-  width: 174px; flex: 0 0 174px; background: linear-gradient(180deg, #fff5f8, #fff0f4);
-  border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 18px 13px;
+  width: 136px; flex: 0 0 136px; background: linear-gradient(180deg, #fff5f8, #fff0f4);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 18px 10px;
   position: relative;
 }
 .sidebar::after { content: "🐾  🦴  ☁️"; position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 13px; letter-spacing: 6px; opacity: .35; pointer-events: none; }
@@ -54,15 +54,15 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .brand-sub { font-size: 11.5px; color: var(--text-mute); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-item {
-  display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0;
+  display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 0;
   border-radius: var(--radius-sm); background: #fffafc; color: #c2516e;
   transition: .15s;
 }
 .nav-item:hover { background: #ffeef4; color: #e07a99; }
 .nav-item.active { background: linear-gradient(135deg, #ffe6ed, #ffd0e0); color: #d94f7c; box-shadow: 0 4px 12px rgba(224, 122, 153, .25); }
-.nav-ico { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.nav-ico img { width: 36px; height: 36px; object-fit: cover; border-radius: 8px; }
-.nav-name { font-size: 13px; font-weight: 600; }
+.nav-ico { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.nav-ico img { width: 32px; height: 32px; object-fit: cover; border-radius: 8px; }
+.nav-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 菜单项背景：首页标签同款黄 / 白色交替 */
 .nav-item:nth-child(odd) { background: #fdf0dc; }
 .nav-item:nth-child(even) { background: #ffffff; }
