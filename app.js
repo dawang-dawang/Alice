@@ -71,7 +71,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811dd", tasks: "icons/日程管理.png?v=20260811dd", memo: "icons/备忘录.png?v=20260811dd", anniv: "icons/纪念日.png?v=20260811dd", finance: "icons/理财管理.png?v=20260811dd", sport: "icons/减脂管理.png?v=20260811dd", plants: "icons/我的植物.png?v=20260811dd", baby: "icons/宝宝养育.png?v=20260811dd", express: "icons/表达能力.png?v=20260811dd", brain: "icons/前额叶训练.png?v=20260811dd" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -714,6 +714,8 @@ const Plants = {
     const opForm = reactive({ date: todayStr(), temp: "", weather: "", type: "浇水", detail: "", note: "" });
     const opTypes = ["浇水", "施肥", "喷药除虫", "修剪", "换盆"];
     const EMOJIS = ["🌷", "🌸", "🌺", "🌻", "🌵", "🎍", "🪴", "🌿", "🍀", "🌴", "🌲", "🍁", "🌾", "🎋", "🌹", "🥀", "🪻", "🌼", "🍃", "🌰"];
+    const emojiOpen = ref(false);
+    function pickEmoji(e) { form.emoji = e; emojiOpen.value = false; }
 
     const cur = computed(() => state.plants.find((x) => x.id === detail.id) || null);
     const libList = computed(() => PLANT_LIB.filter((x) => (lib.cat === "全部" || x.cat === lib.cat) && (!lib.kw || (x.name + (x.latin || "")).toLowerCase().includes(lib.kw.toLowerCase()))));
@@ -831,7 +833,7 @@ const Plants = {
           .catch(() => { notes.loading = false; notes.items = [{ k: "提示", v: "联网获取失败，检查网络后重试。" }]; });
       }
     }
-    return { PLANT_LIB, form, care, search, lib, CATS, libList, detail, cur, opForm, opTypes, EMOJIS, logList, cares, notes, getNotes, wIco, needsWater, needsFert, waterLeft, openAdd, openEdit, save, openCare, saveCare, del, openDetail, pickLib, saveOp, delLog, searchPlant, pickPlant, fetchWeather };
+    return { PLANT_LIB, form, care, search, lib, CATS, libList, detail, cur, opForm, opTypes, EMOJIS, emojiOpen, pickEmoji, logList, cares, notes, getNotes, wIco, needsWater, needsFert, waterLeft, openAdd, openEdit, save, openCare, saveCare, del, openDetail, pickLib, saveOp, delLog, searchPlant, pickPlant, fetchWeather };
   },
   template: `
   <div>
@@ -906,11 +908,15 @@ const Plants = {
       </div>
       <div class="row">
         <div class="field"><label>名称</label><input class="input" v-model="form.name"></div>
-        <div class="field"><label>头像</label><input class="input" v-model="form.emoji" maxlength="2" style="font-size:20px"></div>
-      </div>
-      <div class="field" style="margin-top:-4px">
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          <button v-for="e in EMOJIS" :key="e" class="chip" :class="{active:form.emoji===e}" @click="form.emoji=e" style="font-size:17px;padding:2px 8px;line-height:1.3">{{e}}</button>
+        <div class="field" style="position:relative">
+          <label>头像</label>
+          <button type="button" class="emoji-trigger" @click="emojiOpen=!emojiOpen">
+            <span style="font-size:22px">{{form.emoji||'🌷'}}</span>
+            <span style="font-size:12px;color:var(--text-mute);margin-left:6px">点击选择 ▾</span>
+          </button>
+          <div v-if="emojiOpen" class="emoji-pop">
+            <button v-for="e in EMOJIS" :key="e" class="chip" :class="{active:form.emoji===e}" @click="pickEmoji(e)" style="font-size:18px;padding:4px 9px;line-height:1.3">{{e}}</button>
+          </div>
         </div>
       </div>
       <div class="row">
