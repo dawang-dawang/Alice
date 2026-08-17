@@ -71,7 +71,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811da", tasks: "icons/日程管理.png?v=20260811da", memo: "icons/备忘录.png?v=20260811da", anniv: "icons/纪念日.png?v=20260811da", finance: "icons/理财管理.png?v=20260811da", sport: "icons/减脂管理.png?v=20260811da", plants: "icons/我的植物.png?v=20260811da", baby: "icons/宝宝养育.png?v=20260811da", express: "icons/表达能力.png?v=20260811da", brain: "icons/前额叶训练.png?v=20260811da" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811dc", tasks: "icons/日程管理.png?v=20260811dc", memo: "icons/备忘录.png?v=20260811dc", anniv: "icons/纪念日.png?v=20260811dc", finance: "icons/理财管理.png?v=20260811dc", sport: "icons/减脂管理.png?v=20260811dc", plants: "icons/我的植物.png?v=20260811dc", baby: "icons/宝宝养育.png?v=20260811dc", express: "icons/表达能力.png?v=20260811dc", brain: "icons/前额叶训练.png?v=20260811dc" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -222,9 +222,11 @@ function supaHeaders(anon) {
   if (SUPA_ANON) h["Authorization"] = "Bearer " + (anon ? SUPA_ANON : authState.token);
   return h;
 }
-async function supaFetch(path, method, body, anon) {
+async function supaFetch(path, method, body, anon, extra) {
   if (!SUPA_URL || !SUPA_ANON) throw new Error("请先在 index.html 配置 Supabase 地址与 anon key");
-  const res = await fetch(SUPA_URL + path, { method, headers: supaHeaders(anon), body: body === undefined ? undefined : JSON.stringify(body) });
+  const headers = supaHeaders(anon);
+  if (extra) Object.keys(extra).forEach((k) => { headers[k] = extra[k]; });
+  const res = await fetch(SUPA_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let j = null;
   try { j = await res.json(); } catch (e) {}
   if (!res.ok) {
@@ -259,7 +261,7 @@ async function syncPush() {
   const data = {};
   KEYS.forEach((k) => (data[k] = state[k]));
   const body = { uid: authState.user.id, data, updated_at: new Date().toISOString() };
-  const j = await supaFetch("/rest/v1/wb_data?on_conflict=uid", "POST", body);
+  const j = await supaFetch("/rest/v1/wb_data?on_conflict=uid", "POST", body, false, { "Prefer": "resolution=merge-duplicates, return=representation" });
   if (Array.isArray(j)) return { ok: true };
   if (j && (j.code || j.message)) throw new Error("上传失败：" + (j.message || j.code));
   return { ok: true };
