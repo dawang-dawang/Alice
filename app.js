@@ -915,7 +915,7 @@ const Plants = {
             <span style="font-size:12px;color:var(--text-mute);margin-left:6px">点击选择 ▾</span>
           </button>
           <div v-if="emojiOpen" class="emoji-pop">
-            <button v-for="e in EMOJIS" :key="e" class="chip" :class="{active:form.emoji===e}" @click="pickEmoji(e)" style="font-size:18px;padding:4px 9px;line-height:1.3">{{e}}</button>
+            <button v-for="e in EMOJIS" :key="e" class="chip" :class="{active:form.emoji===e}" @click="pickEmoji(e)" style="font-size:20px">{{e}}</button>
           </div>
         </div>
       </div>
@@ -1135,7 +1135,7 @@ const Sport = {
   components: { Modal },
   setup() {
     const form = reactive({ show: false, title: "记运动", id: null, actId: "", duration: 30, calories: 0, date: todayStr() });
-    const food = reactive({ show: false, id: null, name: "", kcal100: 0, grams: 100, calories: 0, meal: "午餐", custom: true, date: todayStr() });
+    const food = reactive({ show: false, id: null, name: "", kcal100: 0, grams: 100, calories: 0, meal: "午餐", custom: true, date: todayStr(), items: [] });
     const prof = reactive({ show: false, sex: "男", height: 170, age: 30, weight: 65 });
     const actForm = reactive({ show: false, name: "", kcalPerMin: 8 });
     const wform = reactive({ show: false, weight: 65, date: todayStr() });
@@ -1149,12 +1149,16 @@ const Sport = {
       form.show = false; showToast("已保存 ⚽"); }
     function foodCal() { food.calories = Math.round((+food.kcal100 || 0) * (+food.grams || 0) / 100); }
     function autoMeal() { const h = new Date().getHours(); if (h < 10) return "早餐"; if (h < 14) return "午餐"; if (h < 17) return "加餐"; if (h < 21) return "晚餐"; return "加餐"; }
-    function openFood() { Object.assign(food, { show: true, id: null, name: "", kcal100: 0, grams: 100, calories: 0, meal: autoMeal(), custom: true, date: todayStr() }); search.kw = ""; search.results = []; search.done = false; search.loading = false; }
-    function openEditFood(r) { Object.assign(food, { show: true, id: r.id, name: r.food || "", kcal100: 0, grams: r.grams || 100, calories: r.calories || 0, meal: r.meal || "午餐", custom: !(r.grams), date: r.date }); search.kw = ""; search.results = []; search.done = false; search.loading = false; }
+    function openFood() { Object.assign(food, { show: true, id: null, name: "", kcal100: 0, grams: 100, calories: 0, meal: autoMeal(), custom: true, date: todayStr(), items: [] }); search.kw = ""; search.results = []; search.done = false; search.loading = false; }
+    function openEditFood(r) { Object.assign(food, { show: true, id: r.id, name: r.food || "", kcal100: 0, grams: r.grams || 100, calories: r.calories || 0, meal: r.meal || "午餐", custom: !(r.grams), date: r.date, items: [] }); search.kw = ""; search.results = []; search.done = false; search.loading = false; }
     function saveFood() { if (!food.name.trim()) return showToast("填食物名称"); const c = +food.calories || 0; if (!c) return showToast("热量为 0，填一下分量或热量");
       if (food.id) { const r = state.sport.find((x) => x.id === food.id); if (r) Object.assign(r, { food: food.name.trim(), meal: food.meal, grams: food.custom ? 0 : (+food.grams || 0), calories: c, date: food.date }); }
       else state.sport.push({ id: uid(), kind: "food", food: food.name.trim(), meal: food.meal, grams: food.custom ? 0 : (+food.grams || 0), calories: c, date: food.date });
       food.show = false; showToast("已保存 🍽️"); }
+    /* 同一餐记录多个食物：逐条加入本餐列表，最后统一保存 */
+    function addToMeal() { if (!food.name.trim()) return showToast("填食物名称"); const c = +food.calories || 0; if (!c) return showToast("热量为 0，填一下分量或热量"); food.items.push({ name: food.name.trim(), meal: food.meal, grams: food.custom ? 0 : (+food.grams || 0), calories: c }); food.name = ""; food.kcal100 = 0; food.grams = 100; food.calories = 0; food.custom = true; search.kw = ""; search.results = []; search.done = false; search.loading = false; showToast("已加入本餐，可继续加 ➕"); }
+    function delMealItem(i) { food.items.splice(i, 1); }
+    function saveMeal() { if (!food.items.length) return showToast("先加入至少一个食物"); const n = food.items.length; food.items.forEach((it) => state.sport.push({ id: uid(), kind: "food", food: it.name, meal: it.meal, grams: it.grams, calories: it.calories, date: food.date })); food.items = []; food.show = false; showToast("已记录 " + n + " 个食物 🍽️"); }
     /* 统一食物搜索：本地库 + 在线（OpenFoodFacts）结果汇总在一个列表 */
     const search = reactive({ kw: "", results: [], loading: false, done: false });
     let searchTimer = null;
@@ -1199,7 +1203,7 @@ const Sport = {
     });
     const today = computed(() => { const r = state.sport.filter((x) => x.date === todayStr()); const burn = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.calories || 0), 0); const dur = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.duration || 0), 0); const intake = r.filter((x) => x.kind === "food").reduce((s, x) => s + (+x.calories || 0), 0); return { burn, dur, intake, deficit: (state.sportProfile.bmr || 0) + burn - intake }; });
 
-    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, records, daily, today, state };
+    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, addToMeal, saveMeal, delMealItem, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, records, daily, today, state };
   },
   template: `
   <div>
@@ -1256,6 +1260,10 @@ const Sport = {
     </modal>
 
     <modal :show="food.show" :title="food.id?'编辑饮食':'记饮食摄入'" @close="food.show=false">
+      <div class="row">
+        <div class="field"><label>餐次</label><select class="select" v-model="food.meal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>加餐</option></select></div>
+        <div class="field"><label>日期</label><input class="input" type="date" v-model="food.date"></div>
+      </div>
       <div class="field">
         <label>🔍 搜索食物（本地库 + 在线一起搜）</label>
         <div style="display:flex;gap:6px">
@@ -1274,15 +1282,27 @@ const Sport = {
       </div>
       <div class="row">
         <div class="field"><label>食物名称</label><input class="input" v-model="food.name" placeholder="选搜索结果或手填"></div>
-        <div class="field"><label>餐次</label><select class="select" v-model="food.meal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>加餐</option></select></div>
+        <div class="field"><label>每100g热量(kcal)</label><input class="input" type="number" min="0" v-model="food.kcal100" @input="foodCal"></div>
       </div>
       <div class="row">
-        <div class="field"><label>每100g热量(kcal)</label><input class="input" type="number" min="0" v-model="food.kcal100" @input="foodCal"></div>
         <div class="field"><label>分量(克)</label><input class="input" type="number" min="1" v-model="food.grams" @input="foodCal"></div>
+        <div class="field"><label>摄入热量(kcal)</label><input class="input" type="number" min="0" v-model="food.calories"></div>
       </div>
-      <div class="pl-grid"><div class="field"><label>摄入热量(kcal)</label><input class="input" type="number" min="0" v-model="food.calories"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="food.date"></div></div>
       <div style="font-size:12px;color:var(--text-mute);margin:-4px 0 8px">点搜索结果自动填名称和每100g热量，再按「分量 × 每100g」算总热量，可手动改。</div>
-      <div style="text-align:right"><button class="btn" @click="saveFood">保存</button></div>
+
+      <div v-if="!food.id">
+        <button class="btn line" style="width:100%" @click="addToMeal">➕ 加入本餐</button>
+        <div v-if="food.items.length" style="margin-top:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-mute);margin-bottom:6px">已加入本餐（{{food.items.length}}）</div>
+          <div v-for="(it,i) in food.items" :key="i" style="display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px">
+            <span style="flex:1;font-size:13px">{{it.name}}<span style="color:var(--text-mute);font-size:11px"> · {{it.meal}}{{it.grams?(' · '+it.grams+'g'):''}}</span></span>
+            <span style="font-size:12px;color:var(--danger);font-weight:600">−{{it.calories}}</span>
+            <button class="icon-btn danger" @click="delMealItem(i)">✕</button>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:10px"><button class="btn" :disabled="!food.items.length" @click="saveMeal">保存本餐（{{food.items.length}}个）</button></div>
+      </div>
+      <div v-else style="text-align:right;margin-top:6px"><button class="btn" @click="saveFood">保存</button></div>
     </modal>
 
     <modal :show="prof.show" :title="'基础信息（自动算基础代谢）'" @close="prof.show=false">
