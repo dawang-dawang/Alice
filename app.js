@@ -71,7 +71,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811cz", tasks: "icons/日程管理.png?v=20260811cz", memo: "icons/备忘录.png?v=20260811cz", anniv: "icons/纪念日.png?v=20260811cz", finance: "icons/理财管理.png?v=20260811cz", sport: "icons/减脂管理.png?v=20260811cz", plants: "icons/我的植物.png?v=20260811cz", baby: "icons/宝宝养育.png?v=20260811cz", express: "icons/表达能力.png?v=20260811cz", brain: "icons/前额叶训练.png?v=20260811cz" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811da", tasks: "icons/日程管理.png?v=20260811da", memo: "icons/备忘录.png?v=20260811da", anniv: "icons/纪念日.png?v=20260811da", finance: "icons/理财管理.png?v=20260811da", sport: "icons/减脂管理.png?v=20260811da", plants: "icons/我的植物.png?v=20260811da", baby: "icons/宝宝养育.png?v=20260811da", express: "icons/表达能力.png?v=20260811da", brain: "icons/前额叶训练.png?v=20260811da" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -573,7 +573,7 @@ const Tasks = {
     <modal :show="form.show" :title="form.title" @close="form.show=false">
       <div class="field"><label>事件标题</label><input class="input" v-model="form.name" placeholder="要做什么？"></div>
       <div class="field"><label>日历简称（可选）</label><input class="input" v-model="form.short" placeholder="日历格子显示，如：例会、浇水"></div>
-      <div class="row">
+      <div class="pl-grid">
         <div class="field"><label>优先级</label><select class="select" v-model="form.priority"><option>普通</option><option>紧急</option></select></div>
         <div class="field"><label>日期</label><input class="input" type="date" v-model="form.due"></div>
       </div>
@@ -681,6 +681,7 @@ const Plants = {
     const detail = reactive({ show: false, id: null });
     const opForm = reactive({ date: todayStr(), temp: "", weather: "", type: "浇水", detail: "", note: "" });
     const opTypes = ["浇水", "施肥", "喷药除虫", "修剪", "换盆"];
+    const EMOJIS = ["🌷", "🌸", "🌺", "🌻", "🌵", "🎍", "🪴", "🌿", "🍀", "🌴", "🌲", "🍁", "🌾", "🎋", "🌹", "🥀", "🪻", "🌼", "🍃", "🌰"];
 
     const cur = computed(() => state.plants.find((x) => x.id === detail.id) || null);
     const libList = computed(() => PLANT_LIB.filter((x) => (lib.cat === "全部" || x.cat === lib.cat) && (!lib.kw || (x.name + (x.latin || "")).toLowerCase().includes(lib.kw.toLowerCase()))));
@@ -798,7 +799,7 @@ const Plants = {
           .catch(() => { notes.loading = false; notes.items = [{ k: "提示", v: "联网获取失败，检查网络后重试。" }]; });
       }
     }
-    return { PLANT_LIB, form, care, search, lib, CATS, libList, detail, cur, opForm, opTypes, logList, cares, notes, getNotes, wIco, needsWater, needsFert, waterLeft, openAdd, openEdit, save, openCare, saveCare, del, openDetail, pickLib, saveOp, delLog, searchPlant, pickPlant, fetchWeather };
+    return { PLANT_LIB, form, care, search, lib, CATS, libList, detail, cur, opForm, opTypes, EMOJIS, logList, cares, notes, getNotes, wIco, needsWater, needsFert, waterLeft, openAdd, openEdit, save, openCare, saveCare, del, openDetail, pickLib, saveOp, delLog, searchPlant, pickPlant, fetchWeather };
   },
   template: `
   <div>
@@ -875,11 +876,16 @@ const Plants = {
         <div class="field"><label>名称</label><input class="input" v-model="form.name"></div>
         <div class="field"><label>头像</label><input class="input" v-model="form.emoji" maxlength="2" style="font-size:20px"></div>
       </div>
+      <div class="field" style="margin-top:-4px">
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          <button v-for="e in EMOJIS" :key="e" class="chip" :class="{active:form.emoji===e}" @click="form.emoji=e" style="font-size:17px;padding:2px 8px;line-height:1.3">{{e}}</button>
+        </div>
+      </div>
       <div class="row">
         <div class="field"><label>放置位置</label><input class="input" v-model="form.location" placeholder="如：客厅窗台"></div>
         <div class="field"><label>城市（查天气用）</label><input class="input" v-model="form.city" placeholder="如：北京"></div>
       </div>
-      <div class="row">
+      <div class="pl-grid">
         <div class="field"><label>水分习性</label><select class="select" v-model="form.waterNeed"><option>喜湿</option><option>适中</option><option>耐旱</option></select></div>
         <div class="field"><label>入库日期</label><input class="input" type="date" v-model="form.acquired"></div>
       </div>
@@ -1255,7 +1261,7 @@ const Sport = {
     </modal>
 
     <modal :show="wform.show" :title="'记录体重'" @close="wform.show=false">
-      <div class="row"><div class="field"><label>体重(kg)</label><input class="input" type="number" step="0.1" v-model="wform.weight"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="wform.date"></div></div>
+      <div class="pl-grid"><div class="field"><label>体重(kg)</label><input class="input" type="number" step="0.1" v-model="wform.weight"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="wform.date"></div></div>
       <div style="text-align:right"><button class="btn" @click="saveW">保存</button></div>
     </modal>
 
@@ -1397,7 +1403,7 @@ const Anniv = {
         <button class="chip" :class="{active:!form.lunar}" @click="form.lunar=false">公历</button>
         <button class="chip" :class="{active:form.lunar}" @click="form.lunar=true">农历</button>
       </div>
-      <div v-if="!form.lunar" class="row">
+      <div v-if="!form.lunar" class="pl-grid">
         <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div>
         <div class="field"><label>类型</label><select class="select" v-model="form.type"><option>生日</option><option>纪念日</option><option>节日</option><option>证件到期日</option><option>其他</option></select></div>
       </div>
@@ -1603,7 +1609,7 @@ const Baby = {
         <div class="field"><label>宝宝称呼</label><input class="input" v-model="prof.name"></div>
         <div class="field"><label>性别</label><select class="select" v-model="prof.sex"><option>男</option><option>女</option></select></div>
       </div>
-      <div class="field"><label>出生日期</label><input class="input" type="date" v-model="prof.birth"></div>
+      <div class="field"><label>出生日期</label><input class="input" type="date" v-model="prof.birth" style="max-width:240px"></div>
       <div class="hint">💡 性别用于对照最新国标《7 岁以下儿童生长标准》对应 P50 曲线与评估。</div>
       <div style="text-align:right"><button class="btn" @click="saveProf">保存</button></div>
     </modal>
