@@ -266,7 +266,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 
 @media (max-width: 900px) {
   /* 侧边栏改为抽屉：移动端 130px 横排（图标+文字），高度紧凑 + 可滚动，保证 10 模块都能访问 */
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 130px; flex: none; transform: translateX(-100%); transition: transform .28s ease; z-index: 60; border-radius: 0 16px 16px 0; box-shadow: none; padding: 10px 8px; overflow-y: auto; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 149px; flex: none; transform: translateX(-100%); transition: transform .28s ease; z-index: 60; border-radius: 0 16px 16px 0; box-shadow: none; padding: 10px 8px; overflow-y: auto; }
   .sidebar .brand { flex-direction: column; gap: 4px; padding: 2px 0 8px; }
   .sidebar .brand-logo { width: 36px; height: 36px; border-radius: 10px; }
   .sidebar .brand-logo img { width: 31px; height: 31px; }
@@ -276,7 +276,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
   .sidebar .nav-item { flex-direction: row; gap: 7px; padding: 6px 8px; border-radius: 12px; }
   .sidebar .nav-ico { width: 32px; height: 32px; }
   .sidebar .nav-ico img { width: 32px; height: 32px; border-radius: 7px; }
-  .sidebar .nav-name { display: block; font-size: 12px; max-width: 68px; }
+  .sidebar .nav-name { display: block; font-size: 12px; max-width: 86px; }
   .sidebar .badge { font-size: 10px; padding: 0 5px; }
   .sidebar .acc-box { padding: 4px 3px; gap: 4px; }
   .sidebar .acc-main { flex-direction: row; justify-content: center; padding: 6px 4px; font-size: 11px; }

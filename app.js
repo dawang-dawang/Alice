@@ -64,7 +64,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811cu", tasks: "icons/日程管理.png?v=20260811cu", memo: "icons/备忘录.png?v=20260811cu", anniv: "icons/纪念日.png?v=20260811cu", finance: "icons/理财管理.png?v=20260811cu", sport: "icons/减脂管理.png?v=20260811cu", plants: "icons/我的植物.png?v=20260811cu", baby: "icons/宝宝养育.png?v=20260811cu", express: "icons/表达能力.png?v=20260811cu", brain: "icons/前额叶训练.png?v=20260811cu" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811cv", tasks: "icons/日程管理.png?v=20260811cv", memo: "icons/备忘录.png?v=20260811cv", anniv: "icons/纪念日.png?v=20260811cv", finance: "icons/理财管理.png?v=20260811cv", sport: "icons/减脂管理.png?v=20260811cv", plants: "icons/我的植物.png?v=20260811cv", baby: "icons/宝宝养育.png?v=20260811cv", express: "icons/表达能力.png?v=20260811cv", brain: "icons/前额叶训练.png?v=20260811cv" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
