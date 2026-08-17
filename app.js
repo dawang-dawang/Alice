@@ -71,7 +71,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811dc", tasks: "icons/日程管理.png?v=20260811dc", memo: "icons/备忘录.png?v=20260811dc", anniv: "icons/纪念日.png?v=20260811dc", finance: "icons/理财管理.png?v=20260811dc", sport: "icons/减脂管理.png?v=20260811dc", plants: "icons/我的植物.png?v=20260811dc", baby: "icons/宝宝养育.png?v=20260811dc", express: "icons/表达能力.png?v=20260811dc", brain: "icons/前额叶训练.png?v=20260811dc" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811dd", tasks: "icons/日程管理.png?v=20260811dd", memo: "icons/备忘录.png?v=20260811dd", anniv: "icons/纪念日.png?v=20260811dd", finance: "icons/理财管理.png?v=20260811dd", sport: "icons/减脂管理.png?v=20260811dd", plants: "icons/我的植物.png?v=20260811dd", baby: "icons/宝宝养育.png?v=20260811dd", express: "icons/表达能力.png?v=20260811dd", brain: "icons/前额叶训练.png?v=20260811dd" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -210,12 +210,28 @@ function syncPlanTasks() {
 const AUTH_ENABLED = true; // ← 登录功能总开关
 const SUPA_URL = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) ? SUPABASE_URL : "";
 const SUPA_ANON = (typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : "";
-const authState = reactive({ user: null, token: "" });
+const authState = reactive({ user: null, token: "", refreshToken: "" });
 (function initAuth() {
-  try { const a = JSON.parse(localStorage.getItem("lifeWB:auth") || "null"); if (a && a.token) { authState.user = a.user || null; authState.token = a.token; } } catch (e) {}
+  try { const a = JSON.parse(localStorage.getItem("lifeWB:auth") || "null"); if (a && a.token) { authState.user = a.user || null; authState.token = a.token; authState.refreshToken = a.refreshToken || ""; } } catch (e) {}
 })();
 function persistAuth() {
-  localStorage.setItem("lifeWB:auth", JSON.stringify(authState.token ? { user: authState.user, token: authState.token } : null));
+  localStorage.setItem("lifeWB:auth", JSON.stringify(authState.token ? { user: authState.user, token: authState.token, refreshToken: authState.refreshToken } : null));
+}
+/* 用 refresh_token 刷新 access_token（JWT 过期时自动调用） */
+let refreshing = null; // 防止并发刷新
+async function refreshToken() {
+  if (!authState.refreshToken) throw new Error("登录已过期，请重新登录");
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const j = await supaFetch("/auth/v1/token?grant_type=refresh_token", "POST", { refresh_token: authState.refreshToken }, true);
+      authState.token = j.access_token;
+      if (j.refresh_token) authState.refreshToken = j.refresh_token;
+      persistAuth();
+      return j.access_token;
+    } finally { refreshing = null; }
+  })();
+  return refreshing;
 }
 function supaHeaders(anon) {
   const h = { "apikey": SUPA_ANON, "Content-Type": "application/json" };
@@ -229,6 +245,20 @@ async function supaFetch(path, method, body, anon, extra) {
   const res = await fetch(SUPA_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let j = null;
   try { j = await res.json(); } catch (e) {}
+  /* JWT 过期 → 自动刷新 token 重试一次（仅对需认证的请求） */
+  if (!res.ok && !anon && res.status === 401 && (j && (j.error_description || "").indexOf("expired") !== -1)) {
+    try { await refreshToken(); } catch(e2) { /* refresh 也失败 → 抛原始错误 */ }
+    const h2 = supaHeaders(anon);
+    if (extra) Object.keys(extra).forEach((k) => { h2[k] = extra[k]; });
+    const r2 = await fetch(SUPA_URL + path, { method, headers: h2, body: body === undefined ? undefined : JSON.stringify(body) });
+    let j2 = null;
+    try { j2 = await r2.json(); } catch (e) {}
+    if (!r2.ok) {
+      const msg = (j2 && (j2.error_description || j2.msg || j2.message)) || (j2 && j2.error) || ("请求失败(" + r2.status + ")");
+      throw new Error(String(msg));
+    }
+    return j2;
+  }
   if (!res.ok) {
     const msg = (j && (j.error_description || j.msg || j.message)) || (j && j.error) || ("请求失败(" + res.status + ")");
     throw new Error(String(msg));
@@ -244,14 +274,14 @@ function normAccount(acc) {
 /* 注册：账号/邮箱 + 密码（Confirm email 已关闭，注册即登录） */
 async function authRegister(acc, password) {
   const j = await supaFetch("/auth/v1/signup", "POST", { email: normAccount(acc), password }, true);
-  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; persistAuth(); return authState.user;
+  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth(); return authState.user;
 }
 /* 登录：账号/邮箱 + 密码 */
 async function authLogin(acc, password) {
   const j = await supaFetch("/auth/v1/token?grant_type=password", "POST", { email: normAccount(acc), password }, true);
-  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; persistAuth(); return authState.user;
+  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth(); return authState.user;
 }
-function authLogout() { authState.user = null; authState.token = ""; persistAuth(); }
+function authLogout() { authState.user = null; authState.token = ""; authState.refreshToken = ""; persistAuth(); }
 /* 修改密码（需已登录；Supabase 返回 200 但邮箱会收到改密确认链接，用 manage 方式需要 service key） */
 async function authChangePw(newPassword) {
   return supaFetch("/auth/v1/user", "PUT", { password: newPassword });
@@ -2053,7 +2083,11 @@ const App = {
       try {
         const u = authForm.mode === "register" ? await authRegister(acc, authForm.password) : await authLogin(acc, authForm.password);
         authForm.show = false;
-        showToast(authForm.mode === "register" ? "注册成功，" + u.username + "！" : "欢迎，" + u.username + "！");
+        showToast(authForm.mode === "register" ? "注册成功，正在同步…" : "欢迎回来，" + u.username + "，正在同步…");
+        /* 登录/注册成功 → 自动同步（先上传本地数据，再拉取云端合并） */
+        try { await syncPush(); } catch(e) { /* 首次注册可能云端无数据，忽略 */ }
+        try { await syncPull(); } catch(e) { /* 云端可能暂无数据 */ }
+        showToast(authForm.mode === "register" ? "注册成功，数据已同步！" : "欢迎，" + u.username + "！数据已同步");
       } catch (e) { showToast(e.message); }
       authForm.busy = false;
     }
@@ -2075,6 +2109,20 @@ const App = {
     }
     function logout() { authLogout(); showToast("已退出登录"); }
     const accOpen = ref(false);
+
+    /* 页面加载时：如果有 refresh_token → 自动恢复 session + 同步数据 */
+    onMounted(async () => {
+      if (!authState.refreshToken || !AUTH_ENABLED) return;
+      try {
+        await refreshToken(); // 刷新 access_token
+        /* 自动同步：先上传本地最新数据，再拉取云端合并 */
+        try { await syncPush(); } catch(e) { /* 忽略 */ }
+        try { await syncPull(); } catch(e) { /* 云端可能暂无数据，首次使用正常 */ }
+      } catch(e) {
+        /* refresh 失败（token 被撤销等）→ 清除过期登录态 */
+        authLogout();
+      }
+    });
 
     return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
   },
