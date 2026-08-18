@@ -1420,7 +1420,7 @@ const Anniv = {
   components: { Modal },
   setup() {
     const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 });
-    const lunarYears = (() => { const a = []; for (let y = 1995; y <= 2035; y++) a.push(y); return a; })();
+    const lunarYears = (() => { const a = []; for (let y = 1900; y <= 2035; y++) a.push(y); return a; })();
     const list = computed(() => state.anniv.map((a) => { let d = new Date(a.date); const t = new Date(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); return { ...a, days: dayDiff(fmtDate(d), todayStr()) }; }).sort((x, y) => x.days - y.days));
     function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 }); }
     function openEdit(a) {
