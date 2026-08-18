@@ -188,12 +188,21 @@ function syncPlanTasks() {
   const t = todayStr();
   state.anniv.forEach((a) => {
     if (!a.date) return;
-    let due = a.date;
-    if (a.repeat) {
+    let due;
+    if (a.lunar && a.lunar.m && a.lunar.d) {
+      // 农历纪念日：同步到日历用下一个到来的农历月日对应公历日
       const y = +t.slice(0, 4);
-      let cand = y + a.date.slice(4);
-      if (cand < t) cand = y + 1 + a.date.slice(4);
+      let cand = lunarToSolar(y, a.lunar.m, a.lunar.d);
+      if (cand < t) cand = lunarToSolar(y + 1, a.lunar.m, a.lunar.d);
       due = cand;
+    } else {
+      due = a.date;
+      if (a.repeat) {
+        const y = +t.slice(0, 4);
+        let cand = y + a.date.slice(4);
+        if (cand < t) cand = y + 1 + a.date.slice(4);
+        due = cand;
+      }
     }
     add("anniv:" + a.id, "anniv", a.id, "🎈 " + (a.name || "纪念日"), a.type || "", due, a.name ? a.name.slice(0, 8) : "纪念日");
   });
@@ -362,9 +371,20 @@ const Dashboard = {
     });
 
     const annivNear = computed(() => state.anniv.map((a) => {
-      let d = parseD(a.date); const t = parseD(todayStr()); d.setFullYear(t.getFullYear());
-      if (d < t) d.setFullYear(t.getFullYear() + 1);
-      return { ...a, days: dayDiff(fmtDate(d), todayStr()) };
+      let targetStr;
+      if (a.lunar && a.lunar.m && a.lunar.d) {
+        // 农历纪念日：按下一个到来的农历月日对应公历日期倒计时
+        const t = parseD(todayStr());
+        let solar = lunarToSolar(t.getFullYear(), a.lunar.m, a.lunar.d);
+        let d = parseD(solar);
+        if (d < t) { solar = lunarToSolar(t.getFullYear() + 1, a.lunar.m, a.lunar.d); }
+        targetStr = solar;
+      } else {
+        let d = parseD(a.date); const t = parseD(todayStr()); d.setFullYear(t.getFullYear());
+        if (d < t) d.setFullYear(t.getFullYear() + 1);
+        targetStr = fmtDate(d);
+      }
+      return { ...a, days: dayDiff(targetStr, todayStr()) };
     }).sort((x, y) => x.days - y.days).slice(0, 3));
 
     /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
