@@ -50,24 +50,25 @@ function lunarToSolar(y, m, d) {
     return Lunar.fromYmd(+y, +m, +d).getSolar().toYmd();
   } catch (e) { return todayStr(); }
 }
-/* 纪念日倒计时口径（全局唯一）：返回距离下一个到来的目标天数。
-   - 农历：按当年/明年该农历月日对应公历日算（农历每年对应公历不同）
-   - 公历：按今年/明年算（已过的推到明年）
-   纪念日模块列表、首页「最近纪念日」、日程管理区块统一调用此函数，保证三处完全一致。 */
-function annivDays(a) {
-  let target;
+/* 纪念日倒计时目标公历日（全局唯一）：
+   - 农历 + 不重复：按录入时选择的农历年对应公历日（固定那一天）
+   - 农历 + 每年重复：按下一个到来的农历月日对应公历日
+   - 公历 + 不重复：按录入的固定日期
+   - 公历 + 每年重复：按今年/明年下一个到来
+   纪念日模块列表、首页「最近纪念日」、日程管理区块、日历同步统一调用，保证各处完全一致。 */
+function annivTargetDate(a) {
   if (a.lunar && a.lunar.m && a.lunar.d) {
+    if (a.repeat === false) return lunarToSolar(a.lunar.y, a.lunar.m, a.lunar.d);
     const y = +todayStr().slice(0, 4);
     let cand = lunarToSolar(y, a.lunar.m, a.lunar.d);
     if (cand < todayStr()) cand = lunarToSolar(y + 1, a.lunar.m, a.lunar.d);
-    target = cand;
-  } else {
-    let d = parseD(a.date);
-    if (a.repeat !== false) { const t = parseD(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); }
-    target = fmtDate(d);
+    return cand;
   }
-  return dayDiff(target, todayStr());
+  let d = parseD(a.date);
+  if (a.repeat !== false) { const t = parseD(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); }
+  return fmtDate(d);
 }
+function annivDays(a) { return dayDiff(annivTargetDate(a), todayStr()); }
 
 /* 线条小狗（马尔济斯）—— 奶油治愈主题吉祥物 */
 const DOG_SVG = '<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 62 C30 62 26 72 27 84 C28 98 38 106 60 106 C82 106 92 98 93 84 C94 72 90 62 82 62 C76 62 74 66 60 66 C46 66 44 62 38 62 Z" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M36 72 C26 66 20 64 17 70 C14 76 18 80 24 78" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><path d="M44 100 C43 106 46 109 50 109 C54 109 55 106 54 101" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><path d="M66 101 C65 106 66 109 70 109 C74 109 77 106 76 100" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><circle cx="60" cy="40" r="27" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5"/><path d="M35 30 C28 20 22 22 24 31 C25 37 30 41 36 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M85 30 C92 20 98 22 96 31 C95 37 90 41 84 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M34 44 C36 52 44 56 60 56 C76 56 84 52 86 44" fill="none" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><circle cx="51" cy="37" r="2.6" fill="#5C4636"/><circle cx="69" cy="37" r="2.6" fill="#5C4636"/><ellipse cx="60" cy="44" rx="3" ry="2.4" fill="#5C4636"/><path d="M60 46.4 V49 M56.5 48 C57.5 50.5 62.5 50.5 63.5 48" stroke="#5C4636" stroke-width="1.6" stroke-linecap="round"/><path d="M57.5 49.5 C57 52 63 52 62.5 49.5" fill="#F7C7CF"/><ellipse cx="44" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><ellipse cx="76" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><path d="M44 55 C48 60 72 60 76 55" stroke="#D9B98A" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
@@ -203,25 +204,9 @@ function syncPlanTasks() {
     out.push({ id: o ? o.id : uid(), title, short: short || (o && o.short) || "", note, due, priority: "普通", done: o ? !!o.done : false, src, srcId, createdAt: o ? o.createdAt : Date.now() });
   };
   state.memos.forEach((m) => { if (m.syncTask && m.due) add("memo:" + m.id, "memo", m.id, "📝 " + (m.title || "备忘"), m.content ? m.content.slice(0, 40) : "", m.due, m.title ? m.title.slice(0, 8) : "备忘"); });
-  const t = todayStr();
   state.anniv.forEach((a) => {
     if (!a.date) return;
-    let due;
-    if (a.lunar && a.lunar.m && a.lunar.d) {
-      // 农历纪念日：同步到日历用下一个到来的农历月日对应公历日
-      const y = +t.slice(0, 4);
-      let cand = lunarToSolar(y, a.lunar.m, a.lunar.d);
-      if (cand < t) cand = lunarToSolar(y + 1, a.lunar.m, a.lunar.d);
-      due = cand;
-    } else {
-      due = a.date;
-      if (a.repeat) {
-        const y = +t.slice(0, 4);
-        let cand = y + a.date.slice(4);
-        if (cand < t) cand = y + 1 + a.date.slice(4);
-        due = cand;
-      }
-    }
+    const due = annivTargetDate(a); // 与倒计时口径一致：农历不重复按所选农历年、公历不重复按固定日
     add("anniv:" + a.id, "anniv", a.id, "🎈 " + (a.name || "纪念日"), a.type || "", due, a.name ? a.name.slice(0, 8) : "纪念日");
   });
   state.tasks = out;
@@ -1455,6 +1440,9 @@ const Anniv = {
     const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 });
     const lunarYears = (() => { const a = []; for (let y = 1900; y <= 2035; y++) a.push(y); return a; })();
     const list = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days));
+    const TYPES = ["生日", "纪念日", "节日", "证件到期日", "其他"];
+    const cat = ref("全部");
+    const view = computed(() => cat.value === "全部" ? list.value : list.value.filter((a) => a.type === cat.value));
     function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 }); }
     function openEdit(a) {
       Object.assign(form, { show: true, title: "编辑纪念日", id: a.id, name: a.name, date: a.date, type: a.type, repeat: a.repeat, lunar: !!a.lunar, ly: (a.lunar && a.lunar.y) || new Date().getFullYear(), lm: (a.lunar && a.lunar.m) || 8, ld: (a.lunar && a.lunar.d) || 15 });
@@ -1468,7 +1456,7 @@ const Anniv = {
       form.show = false; syncPlanTasks(); showToast("已添加，并同步到日程管理");
     }
     function del(id) { state.anniv = state.anniv.filter((x) => x.id !== id); syncPlanTasks(); showToast("已删除"); }
-    return { form, list, lunarYears, openAdd, openEdit, save, del };
+    return { form, list, lunarYears, TYPES, cat, view, openAdd, openEdit, save, del };
   },
   template: `
   <div>
@@ -1476,8 +1464,12 @@ const Anniv = {
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('anniv')"></span>纪念日</div><div class="module-desc">重要日子自动倒数，并同步到日程管理日历</div></div>
       <button class="btn" @click="openAdd">＋ 新建</button>
     </div>
+    <div class="tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="chip" :class="{active:cat==='全部'}" @click="cat='全部'">全部</button>
+      <button class="chip" v-for="t in TYPES" :key="t" :class="{active:cat===t}" @click="cat=t">{{t}}</button>
+    </div>
     <div class="grid cards-auto">
-      <div class="card" v-for="a in list" :key="a.id">
+      <div class="card" v-for="a in view" :key="a.id">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="font-weight:700;font-size:15.5px">{{a.name}}</div>
           <span class="tag" :class="a.days<=7?(a.days===0?'red':'warn'):'gray'">{{a.days===0?'就是今天！🎈':a.days+' 天后'}}</span>
@@ -1485,7 +1477,7 @@ const Anniv = {
         <div class="meta" style="margin-top:8px"><span class="tag blue">{{a.type}}</span><span>📅 {{a.date}}<span v-if="a.lunar" style="color:var(--text-soft)">（农历{{a.lunar.m}}月{{a.lunar.d}}日）</span>{{a.repeat?'（每年）':''}}</span></div>
         <div style="display:flex;gap:8px;margin-top:12px"><button class="icon-btn" @click="openEdit(a)" title="编辑">✏️</button><button class="icon-btn danger" @click="del(a.id)" title="删除">🗑️</button></div>
       </div>
-      <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🎂</span>还没有纪念日</div>
+      <div v-if="!view.length" class="empty" style="grid-column:1/-1"><span class="big">🎂</span>还没有纪念日</div>
     </div>
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
