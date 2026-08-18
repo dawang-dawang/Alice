@@ -1421,7 +1421,20 @@ const Anniv = {
   setup() {
     const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 });
     const lunarYears = (() => { const a = []; for (let y = 1900; y <= 2035; y++) a.push(y); return a; })();
-    const list = computed(() => state.anniv.map((a) => { let d = new Date(a.date); const t = new Date(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); return { ...a, days: dayDiff(fmtDate(d), todayStr()) }; }).sort((x, y) => x.days - y.days));
+    const list = computed(() => state.anniv.map((a) => {
+      let targetStr;
+      if (a.lunar && a.lunar.m && a.lunar.d) {
+        // 农历纪念日：按「下一个到来的农历月日」对应公历日期倒计时，而非出生年换算出的固定公历日
+        const t = new Date(todayStr());
+        let solar = lunarToSolar(t.getFullYear(), a.lunar.m, a.lunar.d);
+        let d = new Date(solar);
+        if (d < t) { solar = lunarToSolar(t.getFullYear() + 1, a.lunar.m, a.lunar.d); d = new Date(solar); }
+        targetStr = solar;
+      } else {
+        let d = new Date(a.date); const t = new Date(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); targetStr = fmtDate(d);
+      }
+      return { ...a, days: dayDiff(targetStr, todayStr()) };
+    }).sort((x, y) => x.days - y.days));
     function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 }); }
     function openEdit(a) {
       Object.assign(form, { show: true, title: "编辑纪念日", id: a.id, name: a.name, date: a.date, type: a.type, repeat: a.repeat, lunar: !!a.lunar, ly: (a.lunar && a.lunar.y) || new Date().getFullYear(), lm: (a.lunar && a.lunar.m) || 8, ld: (a.lunar && a.lunar.d) || 15 });
