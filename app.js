@@ -50,6 +50,24 @@ function lunarToSolar(y, m, d) {
     return Lunar.fromYmd(+y, +m, +d).getSolar().toYmd();
   } catch (e) { return todayStr(); }
 }
+/* 纪念日倒计时口径（全局唯一）：返回距离下一个到来的目标天数。
+   - 农历：按当年/明年该农历月日对应公历日算（农历每年对应公历不同）
+   - 公历：按今年/明年算（已过的推到明年）
+   纪念日模块列表、首页「最近纪念日」、日程管理区块统一调用此函数，保证三处完全一致。 */
+function annivDays(a) {
+  let target;
+  if (a.lunar && a.lunar.m && a.lunar.d) {
+    const y = +todayStr().slice(0, 4);
+    let cand = lunarToSolar(y, a.lunar.m, a.lunar.d);
+    if (cand < todayStr()) cand = lunarToSolar(y + 1, a.lunar.m, a.lunar.d);
+    target = cand;
+  } else {
+    let d = parseD(a.date);
+    if (a.repeat !== false) { const t = parseD(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); }
+    target = fmtDate(d);
+  }
+  return dayDiff(target, todayStr());
+}
 
 /* 线条小狗（马尔济斯）—— 奶油治愈主题吉祥物 */
 const DOG_SVG = '<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 62 C30 62 26 72 27 84 C28 98 38 106 60 106 C82 106 92 98 93 84 C94 72 90 62 82 62 C76 62 74 66 60 66 C46 66 44 62 38 62 Z" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M36 72 C26 66 20 64 17 70 C14 76 18 80 24 78" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><path d="M44 100 C43 106 46 109 50 109 C54 109 55 106 54 101" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><path d="M66 101 C65 106 66 109 70 109 C74 109 77 106 76 100" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.2" stroke-linejoin="round"/><circle cx="60" cy="40" r="27" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5"/><path d="M35 30 C28 20 22 22 24 31 C25 37 30 41 36 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M85 30 C92 20 98 22 96 31 C95 37 90 41 84 41" fill="#FFF6EA" stroke="#8A6D5B" stroke-width="2.5" stroke-linejoin="round"/><path d="M34 44 C36 52 44 56 60 56 C76 56 84 52 86 44" fill="none" stroke="#8A6D5B" stroke-width="2.5" stroke-linecap="round"/><circle cx="51" cy="37" r="2.6" fill="#5C4636"/><circle cx="69" cy="37" r="2.6" fill="#5C4636"/><ellipse cx="60" cy="44" rx="3" ry="2.4" fill="#5C4636"/><path d="M60 46.4 V49 M56.5 48 C57.5 50.5 62.5 50.5 63.5 48" stroke="#5C4636" stroke-width="1.6" stroke-linecap="round"/><path d="M57.5 49.5 C57 52 63 52 62.5 49.5" fill="#F7C7CF"/><ellipse cx="44" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><ellipse cx="76" cy="43" rx="3.2" ry="2" fill="#FBD9C4" opacity=".8"/><path d="M44 55 C48 60 72 60 76 55" stroke="#D9B98A" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
@@ -370,22 +388,7 @@ const Dashboard = {
       return { inc, exp, bal: inc - exp, tInc, tExp };
     });
 
-    const annivNear = computed(() => state.anniv.map((a) => {
-      let targetStr;
-      if (a.lunar && a.lunar.m && a.lunar.d) {
-        // 农历纪念日：按下一个到来的农历月日对应公历日期倒计时
-        const t = parseD(todayStr());
-        let solar = lunarToSolar(t.getFullYear(), a.lunar.m, a.lunar.d);
-        let d = parseD(solar);
-        if (d < t) { solar = lunarToSolar(t.getFullYear() + 1, a.lunar.m, a.lunar.d); }
-        targetStr = solar;
-      } else {
-        let d = parseD(a.date); const t = parseD(todayStr()); d.setFullYear(t.getFullYear());
-        if (d < t) d.setFullYear(t.getFullYear() + 1);
-        targetStr = fmtDate(d);
-      }
-      return { ...a, days: dayDiff(targetStr, todayStr()) };
-    }).sort((x, y) => x.days - y.days).slice(0, 3));
+    const annivNear = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days).slice(0, 3));
 
     /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
     function babyMonthsAt(ts) { if (!state.babyProfile.birth) return 0; return Math.floor(dayDiff(fmtDate(ts), state.babyProfile.birth) / 30.44); }
@@ -523,6 +526,7 @@ const Tasks = {
     const selTodos = computed(() => state.tasks.filter((t) => t.due === sel.value).sort((a, b) => a.done - b.done));
     const selMood = computed(() => state.moods[sel.value] || null);
     const selLunar = computed(() => getLunar(parseD(sel.value)));
+    const annivNear = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days).slice(0, 3));
 
     function prevMonth() { if (view.m === 0) { view.m = 11; view.y--; } else view.m--; }
     function nextMonth() { if (view.m === 11) { view.m = 0; view.y++; } else view.m++; }
@@ -545,13 +549,22 @@ const Tasks = {
     function toggle(t) { t.done = !t.done; }
     function del(id) { state.tasks = state.tasks.filter((x) => x.id !== id); showToast("已删除"); }
     function clearDone() { const n = state.tasks.filter((t) => t.done).length; state.tasks = state.tasks.filter((x) => !x.done); showToast("已清空 " + n + " 条已完成"); }
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone };
+    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, annivNear, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone };
   },
   template: `
   <div>
     <div class="module-head">
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
       <div style="display:flex;gap:8px"><button class="btn gray" @click="clearDone">清空已完成</button><button class="btn" @click="openAdd">＋ 新事件</button></div>
+    </div>
+
+    <div class="dash-card" style="margin-bottom:14px">
+      <h3><span class="mt-ico"><img :src="iconFor('anniv')"></span>最近纪念日</h3>
+      <div class="dash-line" v-for="a in annivNear" :key="a.id">
+        <span>{{a.name}} <span class="tag gray" style="font-size:10px">{{a.type}}</span></span>
+        <b :style="{color: a.days<=7 ? 'var(--warn)' : 'var(--text-soft)'}">{{a.days===0?'今天！':a.days+' 天后'}}</b>
+      </div>
+      <div v-if="!annivNear.length" class="empty" style="padding:14px 0">暂无纪念日</div>
     </div>
 
     <div class="cal">
@@ -1441,20 +1454,7 @@ const Anniv = {
   setup() {
     const form = reactive({ show: false, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 });
     const lunarYears = (() => { const a = []; for (let y = 1900; y <= 2035; y++) a.push(y); return a; })();
-    const list = computed(() => state.anniv.map((a) => {
-      let targetStr;
-      if (a.lunar && a.lunar.m && a.lunar.d) {
-        // 农历纪念日：按「下一个到来的农历月日」对应公历日期倒计时，而非出生年换算出的固定公历日
-        const t = new Date(todayStr());
-        let solar = lunarToSolar(t.getFullYear(), a.lunar.m, a.lunar.d);
-        let d = new Date(solar);
-        if (d < t) { solar = lunarToSolar(t.getFullYear() + 1, a.lunar.m, a.lunar.d); d = new Date(solar); }
-        targetStr = solar;
-      } else {
-        let d = new Date(a.date); const t = new Date(todayStr()); d.setFullYear(t.getFullYear()); if (d < t) d.setFullYear(t.getFullYear() + 1); targetStr = fmtDate(d);
-      }
-      return { ...a, days: dayDiff(targetStr, todayStr()) };
-    }).sort((x, y) => x.days - y.days));
+    const list = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days));
     function openAdd() { Object.assign(form, { show: true, title: "新建纪念日", id: null, name: "", date: todayStr(), type: "生日", repeat: true, lunar: false, ly: new Date().getFullYear(), lm: 8, ld: 15 }); }
     function openEdit(a) {
       Object.assign(form, { show: true, title: "编辑纪念日", id: a.id, name: a.name, date: a.date, type: a.type, repeat: a.repeat, lunar: !!a.lunar, ly: (a.lunar && a.lunar.y) || new Date().getFullYear(), lm: (a.lunar && a.lunar.m) || 8, ld: (a.lunar && a.lunar.d) || 15 });
