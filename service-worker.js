@@ -4,13 +4,13 @@
    - 其余同源静态资源缓存优先、miss 时下载并缓存 → 日常打开秒开
    版本号：改 app.js/styles.css 等资源时，把 CACHE 名 bump 一次即可（旧缓存自动清理）
 */
-const CACHE = "lifewb-20260820dq";
+const CACHE = "lifewb-20260820dr";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./styles.css?v=20260820dq",
-  "./app.js?v=20260820dq",
-  "./foods_base.js?v=20260820dq",
+  "./styles.css?v=20260820dr",
+  "./app.js?v=20260820dr",
+  "./foods_base.js?v=20260820dr",
   "./vue.global.prod.js",
   "./lunar.js",
   "./plantlib.js",
