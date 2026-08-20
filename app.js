@@ -2249,17 +2249,6 @@ const App = {
       catch (e) { showToast(e.message); }
       pwForm.busy = false;
     }
-    async function doSyncPush() {
-      /* 防御性刷新：进入时先静默 refresh 一次，避免 access_token 已过期又被 supaFetch 重试逻辑漏掉的边缘情况 */
-      if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
-      try { await syncPush(); showToast("已上传到云端"); }
-      catch (e) { showToast(e.message); }
-    }
-    async function doSyncPull() {
-      if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
-      try { await syncPull(true); showToast("已从云端拉取"); }
-      catch (e) { showToast(e.message); }
-    }
     function logout() { stopAutoSync(); authLogout(); showToast("已退出登录"); }
 
     /* ---------- 自动同步：数据变更防抖上传 + 定时拉取 + 切回前台立即同步 ---------- */
@@ -2317,7 +2306,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, logout, AUTH_ENABLED };
   },
   template: `
   <div class="app">
@@ -2342,8 +2331,6 @@ const App = {
               <button class="btn-ghost" @click="openRegister">✨ 注册</button>
             </template>
             <template v-else>
-              <button class="btn-ghost" @click="doSyncPush">⬆️ 上传</button>
-              <button class="btn-ghost" @click="doSyncPull">⬇️ 拉取</button>
               <button class="btn-ghost" @click="pwForm.show=true">🔒 改密</button>
               <button class="btn-ghost" @click="logout">🚪 退出</button>
             </template>
