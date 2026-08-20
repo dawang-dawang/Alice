@@ -250,6 +250,19 @@ function supaHeaders(anon) {
   if (SUPA_ANON) h["Authorization"] = "Bearer " + (anon ? SUPA_ANON : authState.token);
   return h;
 }
+/* 把 Supabase 英文错误翻译成中文友好提示 */
+function humanAuthErr(msg) {
+  if (!msg) return msg;
+  const m = String(msg);
+  if (/jwt\s*expired/i.test(m)) return "登录已过期，正在自动刷新…";
+  if (/refresh\s*token/i.test(m) && (/expired|invalid|used|revoked/i.test(m))) return "登录已失效，请重新登录";
+  if (/invalid\s*grant/i.test(m)) return "登录已失效，请重新登录";
+  if (/invalid\s*credentials|invalid\s*login/i.test(m)) return "账号或密码错误";
+  if (/user.*already.*registered|already.*registered/i.test(m)) return "该账号已注册，直接登录即可";
+  if (/email.*not.*confirmed/i.test(m)) return "请先在邮箱完成验证";
+  if (/password.*should.*be.*at.*least.*6/i.test(m)) return "密码至少 6 位";
+  return m;
+}
 async function supaFetch(path, method, body, anon, extra) {
   if (!SUPA_URL || !SUPA_ANON) throw new Error("请先在 index.html 配置 Supabase 地址与 anon key");
   const headers = supaHeaders(anon);
@@ -257,23 +270,36 @@ async function supaFetch(path, method, body, anon, extra) {
   const res = await fetch(SUPA_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let j = null;
   try { j = await res.json(); } catch (e) {}
-  /* JWT 过期 → 自动刷新 token 重试一次（仅对需认证的请求） */
-  if (!res.ok && !anon && res.status === 401 && (j && (j.error_description || "").indexOf("expired") !== -1)) {
-    try { await refreshToken(); } catch(e2) { /* refresh 也失败 → 抛原始错误 */ }
-    const h2 = supaHeaders(anon);
-    if (extra) Object.keys(extra).forEach((k) => { h2[k] = extra[k]; });
-    const r2 = await fetch(SUPA_URL + path, { method, headers: h2, body: body === undefined ? undefined : JSON.stringify(body) });
-    let j2 = null;
-    try { j2 = await r2.json(); } catch (e) {}
-    if (!r2.ok) {
-      const msg = (j2 && (j2.error_description || j2.msg || j2.message)) || (j2 && j2.error) || ("请求失败(" + r2.status + ")");
-      throw new Error(String(msg));
+  /* JWT 过期检测：兼容多种字段（error_description / msg / message / error_code / 401+expired 组合） */
+  const looksExpired = (obj) => {
+    if (!obj) return false;
+    const ed = String(obj.error_description || "");
+    const msg = String(obj.msg || obj.message || "");
+    const ec = String(obj.error_code || "");
+    return /expired/i.test(ed) || /jwt\s*expired/i.test(msg) || /session_expired/i.test(ec) || (/expired/i.test(JSON.stringify(obj)) && (/jwt|token|grant/i.test(JSON.stringify(obj))));
+  };
+  if (!res.ok && !anon && res.status === 401 && looksExpired(j)) {
+    let refreshOk = true;
+    try { await refreshToken(); } catch (e2) { refreshOk = false; }
+    if (refreshOk) {
+      const h2 = supaHeaders(anon);
+      if (extra) Object.keys(extra).forEach((k) => { h2[k] = extra[k]; });
+      const r2 = await fetch(SUPA_URL + path, { method, headers: h2, body: body === undefined ? undefined : JSON.stringify(body) });
+      let j2 = null;
+      try { j2 = await r2.json(); } catch (e) {}
+      if (!r2.ok) {
+        const msg2 = (j2 && (j2.error_description || j2.msg || j2.message)) || (j2 && j2.error) || ("请求失败(" + r2.status + ")");
+        throw new Error(humanAuthErr(String(msg2)));
+      }
+      return j2;
     }
-    return j2;
+    /* refresh 失败：清掉过期 session，让用户重新登录 */
+    authLogout();
+    throw new Error("登录已失效，请重新登录");
   }
   if (!res.ok) {
     const msg = (j && (j.error_description || j.msg || j.message)) || (j && j.error) || ("请求失败(" + res.status + ")");
-    throw new Error(String(msg));
+    throw new Error(humanAuthErr(String(msg)));
   }
   return j;
 }
@@ -511,7 +537,6 @@ const Tasks = {
     const selTodos = computed(() => state.tasks.filter((t) => t.due === sel.value).sort((a, b) => a.done - b.done));
     const selMood = computed(() => state.moods[sel.value] || null);
     const selLunar = computed(() => getLunar(parseD(sel.value)));
-    const annivNear = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days).slice(0, 3));
 
     function prevMonth() { if (view.m === 0) { view.m = 11; view.y--; } else view.m--; }
     function nextMonth() { if (view.m === 11) { view.m = 0; view.y++; } else view.m++; }
@@ -534,22 +559,13 @@ const Tasks = {
     function toggle(t) { t.done = !t.done; }
     function del(id) { state.tasks = state.tasks.filter((x) => x.id !== id); showToast("已删除"); }
     function clearDone() { const n = state.tasks.filter((t) => t.done).length; state.tasks = state.tasks.filter((x) => !x.done); showToast("已清空 " + n + " 条已完成"); }
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, annivNear, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone };
+    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone };
   },
   template: `
   <div>
     <div class="module-head">
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
       <div style="display:flex;gap:8px"><button class="btn gray" @click="clearDone">清空已完成</button><button class="btn" @click="openAdd">＋ 新事件</button></div>
-    </div>
-
-    <div class="dash-card" style="margin-bottom:14px">
-      <h3><span class="mt-ico"><img :src="iconFor('anniv')"></span>最近纪念日</h3>
-      <div class="dash-line" v-for="a in annivNear" :key="a.id">
-        <span>{{a.name}} <span class="tag gray" style="font-size:10px">{{a.type}}</span></span>
-        <b :style="{color: a.days<=7 ? 'var(--warn)' : 'var(--text-soft)'}">{{a.days===0?'今天！':a.days+' 天后'}}</b>
-      </div>
-      <div v-if="!annivNear.length" class="empty" style="padding:14px 0">暂无纪念日</div>
     </div>
 
     <div class="cal">
@@ -1241,7 +1257,27 @@ const Sport = {
     const wChartHtml = computed(() => (wSeries.value["体重(kg)"].length ? svgLine(wSeries.value, { "体重(kg)": "#c08457" }, "日期") : ""));
     const wTrend = computed(() => { if (wlist.value.length < 2) return null; const latest = +wlist.value[0].weight, prev = +wlist.value[1].weight; return { diff: +(latest - prev).toFixed(1) }; });
 
+    const expanded = ref(false);
     const records = computed(() => [...state.sport].sort((a, b) => (b.date < a.date ? -1 : 1)));
+    // 全部记录：同一天同一餐次的多项菜合并成一行（菜式拼在后面），运动单独成行；用于「全部记录」汇总展示
+    const mealRows = computed(() => {
+      const g = {};
+      state.sport.forEach((r) => {
+        if (r.kind === "exercise") {
+          g[r.date + "|ex|" + r.id] = { date: r.date, kind: "exercise", label: actName(r.actId) || "运动", detail: "", calories: +r.calories || 0, ids: [r.id], rec: r };
+        } else {
+          const mk = r.date + "|fd|" + (r.meal || "餐");
+          if (!g[mk]) g[mk] = { date: r.date, kind: "food", meal: r.meal || "餐", label: "🍽️ " + (r.meal || "餐"), detail: "", calories: 0, ids: [] };
+          g[mk].detail += (g[mk].detail ? "、" : "") + (r.food || "饮食");
+          g[mk].calories += +r.calories || 0;
+          g[mk].ids.push(r.id);
+        }
+      });
+      return Object.values(g).sort((a, b) => (b.date < a.date ? -1 : b.date > a.date ? 1 : 0));
+    });
+    const VISIBLE_ROWS = 5;
+    function delRows(ids) { const set = new Set(ids); state.sport = state.sport.filter((x) => !set.has(x.id)); showToast("已删除"); }
+    function toggleExpand() { expanded.value = !expanded.value; }
     const daily = computed(() => {
       const map = {};
       state.sport.forEach((r) => { map[r.date] = map[r.date] || { burn: 0, dur: 0, intake: 0 };
@@ -1250,7 +1286,7 @@ const Sport = {
     });
     const today = computed(() => { const r = state.sport.filter((x) => x.date === todayStr()); const burn = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.calories || 0), 0); const dur = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.duration || 0), 0); const intake = r.filter((x) => x.kind === "food").reduce((s, x) => s + (+x.calories || 0), 0); return { burn, dur, intake, deficit: (state.sportProfile.bmr || 0) + burn - intake }; });
 
-    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, addToMeal, saveMeal, delMealItem, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, records, daily, today, state };
+    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, addToMeal, saveMeal, delMealItem, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, mealRows, expanded, toggleExpand, delRows, VISIBLE_ROWS, daily, today, state };
   },
   template: `
   <div>
@@ -1280,10 +1316,18 @@ const Sport = {
       </div>
       <div class="card">
         <div style="font-weight:700;margin-bottom:10px">📋 全部记录</div>
-        <table class="tbl" v-if="records.length"><thead><tr><th>日期</th><th>项目</th><th>时长</th><th>热量</th><th></th></tr></thead><tbody>
-          <tr v-for="r in records" :key="r.id"><td>{{r.date}}</td><td>{{r.kind==='exercise'?(actName(r.actId)):('🍽️ '+(r.meal||'')+' '+(r.food||'饮食')+(r.grams?'·'+r.grams+'g':''))}}</td><td>{{r.kind==='exercise'?r.duration+'′':'—'}}</td><td :style="{color:r.kind==='exercise'?'var(--green-deep)':'var(--danger)','font-weight':600}">{{r.kind==='exercise'?'+':'−'}}{{r.calories}}</td><td><div style="display:flex;gap:4px"><button class="icon-btn" @click="r.kind==='exercise'?openEditAct(r):openEditFood(r)">✏️</button><button class="icon-btn danger" @click="delRec(r.id)">🗑️</button></div></td></tr>
+        <table class="tbl" v-if="mealRows.length"><thead><tr><th>日期</th><th>项目</th><th>热量</th><th></th></tr></thead><tbody>
+          <tr v-for="r in mealRows.slice(0, expanded ? mealRows.length : VISIBLE_ROWS)" :key="r.date + r.kind + (r.meal||'')">
+            <td>{{r.date}}</td>
+            <td>{{r.label}}<span v-if="r.detail" style="color:var(--text-mute)"> {{r.detail}}</span></td>
+            <td :style="{color:r.kind==='exercise'?'var(--green-deep)':'var(--danger)','font-weight':600}">{{r.kind==='exercise'?'+':'−'}}{{r.calories}}</td>
+            <td><div style="display:flex;gap:4px"><button v-if="r.kind==='exercise'" class="icon-btn" @click="openEditAct(r.rec)">✏️</button><button class="icon-btn danger" @click="delRows(r.ids)">🗑️</button></div></td>
+          </tr>
         </tbody></table>
         <div v-else class="empty"><span class="big">🔥</span>还没有记录</div>
+        <div v-if="mealRows.length > VISIBLE_ROWS" style="text-align:center;margin-top:10px">
+          <button class="btn gray sm" @click="toggleExpand">{{expanded ? '收起 ▲' : '展开全部（'+mealRows.length+'）▼'}}</button>
+        </div>
       </div>
     </div>
     <div class="card" style="margin-top:14px">
@@ -2180,10 +2224,13 @@ const App = {
       pwForm.busy = false;
     }
     async function doSyncPush() {
+      /* 防御性刷新：进入时先静默 refresh 一次，避免 access_token 已过期又被 supaFetch 重试逻辑漏掉的边缘情况 */
+      if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
       try { await syncPush(); showToast("已上传到云端"); }
       catch (e) { showToast(e.message); }
     }
     async function doSyncPull() {
+      if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
       try { await syncPull(); showToast("已从云端拉取"); }
       catch (e) { showToast(e.message); }
     }
