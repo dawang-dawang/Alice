@@ -324,22 +324,47 @@ function authLogout() { authState.user = null; authState.token = ""; authState.r
 async function authChangePw(newPassword) {
   return supaFetch("/auth/v1/user", "PUT", { password: newPassword });
 }
+/* 上次成功同步时间戳（本地，按账号隔离），用于判断云端是否比本地新 */
+function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
+function setLastSync(t) { if (authState.user) localStorage.setItem("lifeWB:lastSync:" + authState.user.id, t || ""); }
+function localHasData() {
+  return KEYS.some((k) => {
+    const v = state[k];
+    if (Array.isArray(v)) return v.length > 0;
+    if (v && typeof v === "object") return Object.keys(v).length > 0;
+    return false;
+  });
+}
+function cloudHasData(d) {
+  return Object.keys(d).some((k) => {
+    const v = d[k];
+    if (Array.isArray(v)) return v.length > 0;
+    if (v && typeof v === "object") return Object.keys(v).length > 0;
+    return false;
+  });
+}
 /* 上传：本地 → 云端（upsert 到 wb_data 表，按 uid 一行） */
 async function syncPush() {
   const data = {};
   KEYS.forEach((k) => (data[k] = state[k]));
   const body = { uid: authState.user.id, data, updated_at: new Date().toISOString() };
   const j = await supaFetch("/rest/v1/wb_data?on_conflict=uid", "POST", body, false, { "Prefer": "resolution=merge-duplicates, return=representation" });
+  setLastSync(body.updated_at);
   if (Array.isArray(j)) return { ok: true };
   if (j && (j.code || j.message)) throw new Error("上传失败：" + (j.message || j.code));
   return { ok: true };
 }
-/* 下载：云端 → 本地（覆盖，保留同步来源待办重建） */
-async function syncPull() {
+/* 下载：云端 → 本地（覆盖；force=true 手动拉取强制覆盖，忽略 lastSync 保护） */
+async function syncPull(force) {
   const j = await supaFetch("/rest/v1/wb_data?uid=eq." + encodeURIComponent(authState.user.id) + "&select=*", "GET");
   const row = Array.isArray(j) ? j[0] : null;
   if (!row || !row.data) throw new Error("云端暂无数据，先上传一次");
+  /* 保护1：本地已有数据而云端是空数据（被空设备 push 覆盖过）→ 不要用空覆盖本地 */
+  if (!force && localHasData() && !cloudHasData(row.data)) return { ok: true, skipped: true };
+  /* 保护2：本地已有数据、且云端不比本地上次同步新 → 跳过覆盖（保留本地未上传改动，随后 push 会把本地同步上去） */
+  if (!force && localHasData() && lastSync() && row.updated_at && row.updated_at <= lastSync()) return { ok: true, skipped: true };
   Object.keys(row.data).forEach((k) => { if (state[k] !== undefined) state[k] = row.data[k]; });
+  setLastSync(row.updated_at || new Date().toISOString());
   syncPlanTasks(); return { ok: true };
 }
 
@@ -2209,8 +2234,8 @@ const App = {
         authForm.show = false;
         showToast(authForm.mode === "register" ? "注册成功，正在同步…" : "欢迎回来，" + u.username + "，正在同步…");
         /* 登录/注册成功 → 自动同步（先上传本地数据，再拉取云端合并） */
+        try { await syncPull(); } catch(e) { /* 云端可能暂无数据，先拉后传避免空数据覆盖云端 */ }
         try { await syncPush(); } catch(e) { /* 首次注册可能云端无数据，忽略 */ }
-        try { await syncPull(); } catch(e) { /* 云端可能暂无数据 */ }
         showToast(authForm.mode === "register" ? "注册成功，数据已同步！" : "欢迎，" + u.username + "！数据已同步");
       } catch (e) { showToast(e.message); }
       authForm.busy = false;
@@ -2231,7 +2256,7 @@ const App = {
     }
     async function doSyncPull() {
       if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
-      try { await syncPull(); showToast("已从云端拉取"); }
+      try { await syncPull(true); showToast("已从云端拉取"); }
       catch (e) { showToast(e.message); }
     }
     function logout() { authLogout(); showToast("已退出登录"); }
@@ -2243,8 +2268,8 @@ const App = {
       try {
         await refreshToken(); // 刷新 access_token
         /* 自动同步：先上传本地最新数据，再拉取云端合并 */
-        try { await syncPush(); } catch(e) { /* 忽略 */ }
         try { await syncPull(); } catch(e) { /* 云端可能暂无数据，首次使用正常 */ }
+        try { await syncPush(); } catch(e) { /* 忽略 */ }
       } catch(e) {
         /* refresh 失败（token 被撤销等）→ 清除过期登录态 */
         authLogout();
