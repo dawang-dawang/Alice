@@ -2233,9 +2233,10 @@ const App = {
         const u = authForm.mode === "register" ? await authRegister(acc, authForm.password) : await authLogin(acc, authForm.password);
         authForm.show = false;
         showToast(authForm.mode === "register" ? "注册成功，正在同步…" : "欢迎回来，" + u.username + "，正在同步…");
-        /* 登录/注册成功 → 自动同步（先上传本地数据，再拉取云端合并） */
+        /* 登录/注册成功 → 自动同步（先拉取云端，再上传本地，避免空数据覆盖云端） */
         try { await syncPull(); } catch(e) { /* 云端可能暂无数据，先拉后传避免空数据覆盖云端 */ }
         try { await syncPush(); } catch(e) { /* 首次注册可能云端无数据，忽略 */ }
+        startAutoSync(); /* 开启自动同步：变更自动上传 + 定时拉取 + 回前台即同步 */
         showToast(authForm.mode === "register" ? "注册成功，数据已同步！" : "欢迎，" + u.username + "！数据已同步");
       } catch (e) { showToast(e.message); }
       authForm.busy = false;
@@ -2259,7 +2260,45 @@ const App = {
       try { await syncPull(true); showToast("已从云端拉取"); }
       catch (e) { showToast(e.message); }
     }
-    function logout() { authLogout(); showToast("已退出登录"); }
+    function logout() { stopAutoSync(); authLogout(); showToast("已退出登录"); }
+
+    /* ---------- 自动同步：数据变更防抖上传 + 定时拉取 + 切回前台立即同步 ---------- */
+    let autoWatchStop = null, autoPushTimer = null, autoPullTimer = null, autoVisFn = null;
+    function stopAutoSync() {
+      if (autoWatchStop) { autoWatchStop(); autoWatchStop = null; }
+      if (autoPushTimer) { clearTimeout(autoPushTimer); autoPushTimer = null; }
+      if (autoPullTimer) { clearInterval(autoPullTimer); autoPullTimer = null; }
+      if (autoVisFn) { document.removeEventListener("visibilitychange", autoVisFn); autoVisFn = null; }
+    }
+    function startAutoSync() {
+      stopAutoSync();
+      if (!AUTH_ENABLED || !authState.user) return;
+      let suppressUntil = Date.now() + 6000; /* 登录后 6s 内的变化多为恢复数据/首次拉取，跳过，避免空转上传 */
+      /* ① 数据变更 → 防抖 2.5s 自动上传（静默，失败不打扰） */
+      autoWatchStop = watch(
+        () => KEYS.map((k) => JSON.stringify(state[k] || null)).join("~"),
+        () => {
+          if (Date.now() < suppressUntil) return;
+          if (autoPushTimer) clearTimeout(autoPushTimer);
+          autoPushTimer = setTimeout(() => {
+            if (authState.user) syncPush().catch(() => {});
+          }, 2500);
+        }
+      );
+      /* ② 每 30s 静默拉取（lastSync 保护：云端没更新不会覆盖本地） */
+      autoPullTimer = setInterval(() => {
+        if (authState.user) syncPull().catch(() => {});
+      }, 30000);
+      /* ③ 切回前台立即拉取 + 上传 */
+      autoVisFn = () => {
+        if (document.visibilityState === "visible" && authState.user) {
+          suppressUntil = Date.now() + 4000; /* 拉取引起的 state 变化，4s 内不反向触发上传 */
+          syncPull().catch(() => {});
+          syncPush().catch(() => {});
+        }
+      };
+      document.addEventListener("visibilitychange", autoVisFn);
+    }
     const accOpen = ref(false);
 
     /* 页面加载时：如果有 refresh_token → 自动恢复 session + 同步数据 */
@@ -2270,11 +2309,13 @@ const App = {
         /* 自动同步：先上传本地最新数据，再拉取云端合并 */
         try { await syncPull(); } catch(e) { /* 云端可能暂无数据，首次使用正常 */ }
         try { await syncPush(); } catch(e) { /* 忽略 */ }
+        startAutoSync(); /* 开启自动同步：变更自动上传 + 定时拉取 + 回前台即同步 */
       } catch(e) {
         /* refresh 失败（token 被撤销等）→ 清除过期登录态 */
         authLogout();
       }
     });
+    onUnmounted(() => stopAutoSync());
 
     return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncPush, doSyncPull, logout, AUTH_ENABLED };
   },
