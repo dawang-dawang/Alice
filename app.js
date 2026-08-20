@@ -1071,7 +1071,7 @@ function plantNextCares(p) {
 }
 
 /* 常见食物热量库（kcal/100g，中式为主） */
-const FOODS = [
+const FOODS_DISH = [
   // 主食
   { n: "米饭", k: 116 }, { n: "面条（煮）", k: 110 }, { n: "米粉", k: 110 }, { n: "白粥", k: 46 }, { n: "馒头", k: 223 },
   { n: "全麦面包", k: 246 }, { n: "燕麦片（干）", k: 377 }, { n: "玉米", k: 112 }, { n: "红薯", k: 86 }, { n: "土豆", k: 77 },
@@ -1151,6 +1151,8 @@ const FOODS = [
   { n: "鱼丸", k: 120 }, { n: "虾丸", k: 110 }, { n: "贡丸", k: 150 }, { n: "鱼豆腐", k: 150 }, { n: "蟹柳", k: 140 }, { n: "墨鱼丸", k: 120 },
   { n: "牛百叶", k: 90 }, { n: "鸭血", k: 55 }, { n: "冻豆腐", k: 80 }, { n: "宽粉", k: 350 }, { n: "土豆粉", k: 340 },
 ];
+/* 合并：食材级权威库(FOODS_BASE，开源《中国食物成分表》第6版) + 菜品级手填库(FOODS_DISH)；同名以权威库为准 */
+const FOODS = (() => { const seen = {}, out = []; for (const f of FOODS_BASE.concat(FOODS_DISH)) { if (seen[f.n]) continue; seen[f.n] = 1; out.push(f); } return out; })();
 /* 基础代谢（Mifflin-St Jeor）：男 +5，女 −161 */
 function calcBmr(sex, height, age, weight) {
   const h = +height || 170, a = +age || 30, w = +weight || 65;
