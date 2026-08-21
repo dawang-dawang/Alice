@@ -2276,6 +2276,16 @@ const App = {
       pwForm.busy = false;
     }
     function logout() { stopAutoSync(); authLogout(); showToast("已退出登录"); }
+    /* 手动云端同步：先拉取（带防覆盖保护）再上传，立即执行一次 */
+    async function doSyncNow() {
+      if (!authState.user) return showToast("请先登录");
+      if (authState.refreshToken) { try { await refreshToken(); } catch (e) { /* 失效由 supaFetch 兜底 */ } }
+      try {
+        await syncPull();
+        await syncPush();
+        showToast("已同步 ☁️");
+      } catch (e) { showToast(e.message); }
+    }
 
     /* ---------- 自动同步：数据变更防抖上传 + 定时拉取 + 切回前台立即同步 ---------- */
     let autoWatchStop = null, autoPushTimer = null, autoPullTimer = null, autoVisFn = null;
@@ -2332,7 +2342,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED };
   },
   template: `
   <div class="app">
@@ -2357,6 +2367,7 @@ const App = {
               <button class="btn-ghost" @click="openRegister">✨ 注册</button>
             </template>
             <template v-else>
+              <button class="btn-ghost" @click="doSyncNow">☁️ 云端同步</button>
               <button class="btn-ghost" @click="pwForm.show=true">🔒 改密</button>
               <button class="btn-ghost" @click="logout">🚪 退出</button>
             </template>
