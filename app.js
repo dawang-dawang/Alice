@@ -327,8 +327,10 @@ async function authChangePw(newPassword) {
 /* 上次成功同步时间戳（本地，按账号隔离），用于判断云端是否比本地新 */
 function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
 function setLastSync(t) { if (authState.user) localStorage.setItem("lifeWB:lastSync:" + authState.user.id, t || ""); }
+/* 用户真正录入的数据 key（不含 sportActs/sportProfile/babyProfile 等内置或默认结构，避免误判"云端有数据"） */
+const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast"];
 function localHasData() {
-  return KEYS.some((k) => {
+  return USER_DATA_KEYS.some((k) => {
     const v = state[k];
     if (Array.isArray(v)) return v.length > 0;
     if (v && typeof v === "object") return Object.keys(v).length > 0;
@@ -336,11 +338,29 @@ function localHasData() {
   });
 }
 function cloudHasData(d) {
-  return Object.keys(d).some((k) => {
+  return USER_DATA_KEYS.some((k) => {
     const v = d[k];
     if (Array.isArray(v)) return v.length > 0;
     if (v && typeof v === "object") return Object.keys(v).length > 0;
     return false;
+  });
+}
+/* 首合同步合并：两端都有数据时按 id/键合并，避免覆盖丢数据（数组按 id 去重，字典按键合并，配置类云端优先） */
+function mergeState(cloud) {
+  Object.keys(cloud).forEach((k) => {
+    if (state[k] === undefined) return;
+    const c = cloud[k], l = state[k];
+    if (Array.isArray(c) && Array.isArray(l)) {
+      const map = new Map();
+      l.forEach((it) => map.set(it && it.id ? it.id : JSON.stringify(it), it));
+      c.forEach((it) => { const key = it && it.id ? it.id : JSON.stringify(it); if (!map.has(key)) map.set(key, it); });
+      state[k] = [...map.values()];
+    } else if (c && typeof c === "object" && l && typeof l === "object") {
+      if (k === "sportProfile" || k === "babyProfile") state[k] = { ...l, ...c }; /* 配置类：云端值优先 */
+      else state[k] = { ...c, ...l }; /* 字典类：本地值优先（保留本地最新） */
+    } else {
+      state[k] = c;
+    }
   });
 }
 /* 上传：本地 → 云端（upsert 到 wb_data 表，按 uid 一行） */
@@ -363,6 +383,12 @@ async function syncPull(force) {
   if (!force && localHasData() && !cloudHasData(row.data)) return { ok: true, skipped: true };
   /* 保护2：本地已有数据、且云端不比本地上次同步新 → 跳过覆盖（保留本地未上传改动，随后 push 会把本地同步上去） */
   if (!force && localHasData() && lastSync() && row.updated_at && row.updated_at <= lastSync()) return { ok: true, skipped: true };
+  /* 保护3：本地有数据但从未同步过（lastSync 为空）→ 首合同步：合并两端，绝不覆盖丢数据 */
+  if (!force && localHasData() && !lastSync()) {
+    mergeState(row.data);
+    setLastSync(row.updated_at || new Date().toISOString());
+    syncPlanTasks(); return { ok: true, merged: true };
+  }
   Object.keys(row.data).forEach((k) => { if (state[k] !== undefined) state[k] = row.data[k]; });
   setLastSync(row.updated_at || new Date().toISOString());
   syncPlanTasks(); return { ok: true };
