@@ -111,17 +111,31 @@ function svgPie(data) {
   return '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><svg width="136" height="136" viewBox="0 0 136 136">' + parts.join("") + '</svg><div class="legend" style="flex-direction:column;margin:0">' + legend + "</div></div>";
 }
 
-/* SVG 折线图（x 为月数或时间戳） */
-function svgLine(series, colors, xLabel) {
+/* SVG 折线图（x 为月数或时间戳）
+   opt：{ yMin, yMax } 固定 Y 轴范围（数据超出时自动扩展，保证点完整可见）
+        { dotClick, dotClass } 圆点可点击：画一层透明大圆做热区，data-id 带记录 id，父容器事件委托即可 */
+function svgLine(series, colors, xLabel, opt) {
+  opt = opt || {};
   const all = []; Object.values(series).forEach((a) => a.forEach((p) => all.push(p)));
   if (!all.length) return "";
   const W = 560, H = 210, padL = 38, padB = 28, padT = 12, padR = 14;
   const xs = all.map((p) => p.x); const xmin = Math.min(...xs), xmax = Math.max(...xs);
-  const ymax = Math.max(...all.map((p) => p.y)) * 1.12 || 1; const ymin = 0;
+  let ymin = 0; let ymax = Math.max(...all.map((p) => p.y)) * 1.12 || 1;
+  if (opt.yMin != null && opt.yMax != null) {
+    ymin = opt.yMin; ymax = opt.yMax;
+    const dmin = Math.min(...all.map((p) => p.y)), dmax = Math.max(...all.map((p) => p.y));
+    if (dmin < ymin) ymin = Math.floor(dmin - 2);
+    if (dmax > ymax) ymax = Math.ceil(dmax + 2);
+  }
   const sx = (x) => padL + (xmax === xmin ? (W - padL - padR) / 2 : (x - xmin) / (xmax - xmin) * (W - padL - padR));
   const sy = (y) => H - padB - (y - ymin) / (ymax - ymin) * (H - padT - padB);
   let grid = "";
-  for (let i = 0; i <= 4; i++) { const y = padT + i * (H - padT - padB) / 4; const val = Math.round(ymax * (1 - i / 4)); grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#eef2f0"></line><text x="4" y="' + (y + 4) + '" font-size="10" fill="#a2b1aa">' + val + "</text>"; }
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + i * (H - padT - padB) / 4;
+    const val = ymin + (ymax - ymin) * (1 - i / 4);
+    const txt = Math.abs(val - Math.round(val)) < 0.05 ? String(Math.round(val)) : val.toFixed(1);
+    grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#eef2f0"></line><text x="4" y="' + (y + 4) + '" font-size="10" fill="#a2b1aa">' + txt + "</text>";
+  }
   let paths = "";
   Object.keys(series).forEach((k) => {
     const arr = series[k]; if (!arr.length) return;
@@ -129,7 +143,17 @@ function svgLine(series, colors, xLabel) {
     let c = colors[k] || "#5fa98a"; let dash = ""; let noDot = false;
     if (typeof c === "string") { const parts = c.split("|"); if (parts.length > 1) { c = parts[0]; dash = parts[1]; noDot = true; } }
     paths += '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="2.5"' + (dash ? ' stroke-dasharray="' + dash + '"' : "") + "></path>";
-    if (!noDot) arr.forEach((p) => { paths += '<circle cx="' + sx(p.x).toFixed(1) + '" cy="' + sy(p.y).toFixed(1) + '" r="3.3" fill="' + c + '"></circle>'; });
+    if (!noDot) {
+      let dots = "", hit = "";
+      arr.forEach((p) => {
+        const cx = sx(p.x).toFixed(1), cy = sy(p.y).toFixed(1);
+        const tip = p.tip ? "<title>" + p.tip + "</title>" : "";
+        // 实心点：不接收鼠标事件，保证点击落到下方热区
+        dots += '<circle cx="' + cx + '" cy="' + cy + '" r="3.3" fill="' + c + '" style="pointer-events:none">' + tip + "</circle>";
+        if (opt.dotClick) hit += '<circle class="' + (opt.dotClass || "chartdot") + '" data-id="' + (p.id || "") + '" cx="' + cx + '" cy="' + cy + '" r="11" fill="transparent" style="cursor:pointer">' + tip + "</circle>";
+      });
+      paths += dots + hit; // 热区最后画，盖在最上层，点击最灵敏
+    }
   });
   const lg = Object.keys(series).map((k) => { const c0 = (colors[k] || "#5fa98a").split("|")[0]; return '<span><i class="dot" style="background:' + c0 + '"></i>' + k + "</span>"; }).join("");
   const xl = xLabel ? '<text x="' + (W - padR) + '" y="' + (H - 6) + '" font-size="10" fill="#a2b1aa" text-anchor="end">' + xLabel + "</text>" : "";
@@ -420,6 +444,18 @@ const Dashboard = {
     const lunar = computed(() => getLunar(now.value));
     const week = "日一二三四五六"[now.value.getDay()];
     const dateText = computed(() => { const p = fmtDate(now.value).split("-"); return p[0] + "年" + p[1] + "月" + p[2] + "日"; });
+    const dateTextShort = computed(() => { const p = fmtDate(now.value).split("-"); return +p[1] + "月" + p[2] + "日"; });
+    const today = computed(() => todayStr());
+    const hour = computed(() => now.value.getHours());
+    const greeting = computed(() => {
+      const h = hour.value;
+      if (h < 5) return "夜深了，早点休息";
+      if (h < 11) return "早上好";
+      if (h < 13) return "中午好";
+      if (h < 18) return "下午好";
+      if (h < 22) return "晚上好";
+      return "夜深了，早点休息";
+    });
 
     const tasksActive = computed(() => state.tasks.filter((t) => !t.done).length);
     const tasksToday = computed(() => state.tasks.filter((t) => !t.done && t.due === todayStr()).length);
@@ -440,6 +476,7 @@ const Dashboard = {
       const deficit = (state.sportProfile.bmr || 0) + burn - intake;
       return { burn, dur, intake, deficit };
     });
+    const sportRecent = computed(() => state.sport.filter((r) => r.date === todayStr()).slice(-1).map((r) => ({ txt: r.name || (r.kind === "exercise" ? "运动" : "饮食"), sub: r.kind === "exercise" ? "-" + r.calories + "kcal" : "+" + r.calories + "kcal" })));
 
     const finMonth = computed(() => {
       const ym = todayStr().slice(0, 7);
@@ -449,8 +486,57 @@ const Dashboard = {
       const tExp = state.finance.filter((r) => r.type === "expense" && r.date === todayStr()).reduce((s, r) => s + (+r.amount || 0), 0);
       return { inc, exp, bal: inc - exp, tInc, tExp };
     });
+    const financeRecent = computed(() => {
+      const list = state.finance.filter((r) => r.date === todayStr()).slice(-2);
+      return list.map((r) => ({ txt: r.note || (r.type === "income" ? "收入" : "支出"), sub: (r.type === "income" ? "+" : "-") + r.amount }));
+    });
+    const financeTodayCount = computed(() => state.finance.filter((r) => r.date === todayStr()).length);
 
     const annivNear = computed(() => state.anniv.map((a) => ({ ...a, days: annivDays(a) })).sort((x, y) => x.days - y.days).slice(0, 3));
+    const annivSoon7 = computed(() => annivNear.value.find((a) => a.days >= 0 && a.days <= 7));
+
+    const tasksRecent = computed(() => state.tasks.filter((t) => !t.done).sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999")).slice(0, 2));
+    const plantsDueSoon = computed(() => state.plants.filter((p) => {
+      const nw = p.lastWater ? dayDiff(addDays(p.lastWater, plantWaterDays(p)), todayStr()) : 0;
+      const nf = p.lastFertilize ? dayDiff(addDays(p.lastFertilize, p.fertilizeInterval || 30), todayStr()) : 0;
+      return nw <= 0 || nf <= 0;
+    }).slice(0, 1));
+    const babyCount = computed(() => state.baby.length);
+
+    /* 今天要处理 · 置顶区（最多 4 条，逾期优先） */
+    const todayHandle = computed(() => {
+      const list = [];
+      const overdue = state.tasks.filter((t) => !t.done && t.due && t.due < todayStr()).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 2);
+      overdue.forEach((t) => list.push({ urgent: true, flag: "逾期", flagCls: "", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks" }));
+      const dueToday = state.tasks.filter((t) => !t.done && t.due === todayStr()).slice(0, 1);
+      dueToday.forEach((t) => list.push({ urgent: false, flag: "今日", flagCls: "warn", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks" }));
+      if (plantsNeed.value > 0) {
+        const p = plantsDueSoon.value[0];
+        list.push({ urgent: plantsNeed.value >= 3, flag: "养护", flagCls: plantsNeed.value >= 3 ? "" : "green", text: p ? (p.name + " 需浇水/施肥") : (plantsNeed.value + " 株植物待养护"), key: "plants" });
+      }
+      if (annivSoon7.value) {
+        const a = annivSoon7.value;
+        list.push({ urgent: a.days <= 1, flag: "纪念日", flagCls: a.days <= 1 ? "warn" : "green", text: a.name + " · " + (a.days === 0 ? "就是今天" : a.days + " 天后"), key: "anniv" });
+      }
+      return list.slice(0, 4);
+    });
+    const todayHandleCount = computed(() => {
+      let n = 0;
+      n += state.tasks.filter((t) => !t.done && t.due && t.due < todayStr()).length;
+      if (plantsNeed.value > 0) n++;
+      if (annivSoon7.value) n++;
+      return n;
+    });
+
+    /* 快捷入口 · 6 个 */
+    const quickActions = computed(() => ([
+      { key: "tasks", ico: "tasks", name: "日程", num: tasksActive.value ? tasksActive.value + " 待办" : "今日 " + tasksToday.value, badge: tasksOverdue.value || 0 },
+      { key: "anniv", ico: "anniv", name: "纪念日", num: annivNear.value[0] ? (annivNear.value[0].days === 0 ? "今天" : annivNear.value[0].days + " 天后") : "暂无", badge: 0 },
+      { key: "finance", ico: "finance", name: "记账", num: "今日 " + financeTodayCount.value + " 笔", badge: 0 },
+      { key: "plants", ico: "plants", name: "植物", num: plantsTotal.value + " 株", badge: plantsNeed.value || 0 },
+      { key: "sport", ico: "sport", name: "运动", num: "已消耗 " + sportToday.value.burn + " kcal", badge: 0 },
+      { key: "baby", ico: "baby", name: "宝宝", num: babyCount.value + " 条记录", badge: 0 },
+    ]));
 
     /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
     function babyMonthsAt(ts) { if (!state.babyProfile.birth) return 0; return Math.floor(dayDiff(fmtDate(ts), state.babyProfile.birth) / 30.44); }
@@ -474,7 +560,7 @@ const Dashboard = {
       return any ? svgLine(out, outC, "月龄") : "";
     });
 
-    return { now, slogan, hintShow, lunar, week, dateText, tasksActive, tasksToday, tasksOverdue, plantsTotal, plantsNeed, sportToday, finMonth, annivNear, growthChart, iconSvg, DOG_SVG };
+    return { now, slogan, hintShow, lunar, week, dateText, dateTextShort, greeting, today, tasksActive, tasksToday, tasksOverdue, tasksRecent, plantsTotal, plantsNeed, plantsDueSoon, sportToday, sportRecent, finMonth, financeRecent, financeTodayCount, annivNear, annivSoon7, babyCount, todayHandle, todayHandleCount, quickActions, growthChart, iconSvg, iconFor, DOG_SVG };
   },
   template: `
   <div>
@@ -483,12 +569,58 @@ const Dashboard = {
       <button class="dh-close" @click="hintShow=false">✕</button>
     </div>
     <div class="dash-hero">
-      <div>
-        <div class="date">{{dateText}} · 周{{week}}</div>
+      <div class="hero-left">
+        <div class="greet">{{greeting}} · 大王的小瓶</div>
+        <div class="date"><span class="d-full">{{dateText}}</span><span class="d-short">{{dateTextShort}}</span> · 周{{week}}</div>
         <div class="sub">农历 {{lunar.text}}　{{lunar.term ? '· '+lunar.term : ''}}　{{lunar.full}}</div>
+        <div class="slogan">“{{slogan}}”</div>
       </div>
-      <div class="slogan">“{{slogan}}”</div>
-      <div class="dog"><img src="icons/bow.png" alt="蝴蝶结"></div>
+      <div class="hero-right">
+        <div class="hero-chip-row">
+          <span class="hero-chip" :class="{warn: tasksOverdue>0}" @click="$emit('goto','tasks')">
+            <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="currentColor"/></svg>
+            <b>{{tasksOverdue}}</b>&nbsp;逾期
+          </span>
+          <span class="hero-chip" @click="$emit('goto','tasks')">
+            <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <b>{{tasksToday}}</b>&nbsp;今日待办
+          </span>
+          <span v-if="annivNear.length" class="hero-chip" :class="{warn: annivSoon7 && annivSoon7.days<=1}" @click="$emit('goto','anniv')">
+            <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><path d="M12 21s-7-4.5-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.5-7 10-7 10z" fill="currentColor"/></svg>
+            <b v-if="annivNear[0].days===0">今天</b><b v-else>{{annivNear[0].days}}天</b>&nbsp;纪念日
+          </span>
+        </div>
+        <div class="dog"><img src="icons/bow.png" alt="蝴蝶结"></div>
+      </div>
+    </div>
+
+    <div class="today-handle">
+      <div class="th-head">
+        <div class="th-title">
+          <span class="th-ico">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#e07a99" stroke-width="1.7"/><path d="M12 7v5l3.5 2" stroke="#e07a99" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </span>
+          今天要处理
+          <span v-if="todayHandleCount>0" class="th-count">{{todayHandleCount}}</span>
+        </div>
+      </div>
+      <div v-if="todayHandle.length" class="th-list">
+        <div v-for="(h,i) in todayHandle" :key="i" class="th-item" :class="{urgent:h.urgent}" @click="$emit('goto',h.key)">
+          <span class="th-flag" :class="h.flagCls">{{h.flag}}</span>
+          <span class="th-text">{{h.text}}</span>
+          <span class="th-go">去处理 ›</span>
+        </div>
+      </div>
+      <div v-else class="th-empty">今天没有需要处理的事项，休息一下吧～</div>
+    </div>
+
+    <div class="quick">
+      <button v-for="q in quickActions" :key="q.key" class="quick-item" @click="$emit('goto',q.key)">
+        <span v-if="q.badge>0" class="qi-badge">{{q.badge}}</span>
+        <span class="qi-ico"><img :src="iconFor(q.ico)"></span>
+        <span class="qi-name">{{q.name}}</span>
+        <span class="qi-num">{{q.num}}</span>
+      </button>
     </div>
 
     <div class="dash-grid">
@@ -498,6 +630,12 @@ const Dashboard = {
           <div class="mini"><div class="mv">{{tasksActive}}</div><div class="mk">未完成总数</div></div>
           <div class="mini"><div class="mv">{{tasksToday}}</div><div class="mk">今日待办</div></div>
           <div class="mini"><div class="mv danger">{{tasksOverdue}}</div><div class="mk">逾期事件</div></div>
+        </div>
+        <div v-if="tasksRecent.length" class="recent">
+          <div class="rh">最近未完成</div>
+          <div class="rh-list">
+            <div v-for="t in tasksRecent" :key="t.id" class="ri"><span>{{t.title || t.name || '未命名'}}</span><b>{{t.due || '∞'}}</b></div>
+          </div>
         </div>
       </div>
 
@@ -516,6 +654,12 @@ const Dashboard = {
           <div class="mini"><div class="mv">{{plantsTotal}}</div><div class="mk">养护中总数</div></div>
           <div class="mini"><div class="mv warn">{{plantsNeed}}</div><div class="mk">今日需养护</div></div>
         </div>
+        <div v-if="plantsDueSoon.length" class="recent">
+          <div class="rh">即将到期</div>
+          <div class="rh-list">
+            <div v-for="p in plantsDueSoon" :key="p.id" class="ri"><span>{{p.name || '未命名'}}</span><b>需养护</b></div>
+          </div>
+        </div>
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','sport')">
@@ -525,6 +669,12 @@ const Dashboard = {
           <div class="mini"><div class="mv">{{sportToday.intake}}</div><div class="mk">饮食摄入(kcal)</div></div>
           <div class="mini"><div class="mv" :class="sportToday.deficit>=0?'':'danger'">{{sportToday.deficit}}</div><div class="mk">热量缺口(kcal)</div></div>
         </div>
+        <div v-if="sportRecent.length" class="recent">
+          <div class="rh">今日最新</div>
+          <div class="rh-list">
+            <div v-for="(r,i) in sportRecent" :key="i" class="ri"><span>{{r.txt}}</span><b>{{r.sub}}</b></div>
+          </div>
+        </div>
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','finance')">
@@ -533,6 +683,12 @@ const Dashboard = {
         <div class="dash-line"><span>本月支出</span><b style="color:var(--danger)">−{{finMonth.exp}}</b></div>
         <div class="dash-line"><span>本月结余</span><b>{{finMonth.bal}}</b></div>
         <div class="dash-line"><span>今日收支</span><b>+{{finMonth.tInc}} / −{{finMonth.tExp}}</b></div>
+        <div v-if="financeRecent.length" class="recent">
+          <div class="rh">最近一笔</div>
+          <div class="rh-list">
+            <div v-for="(r,i) in financeRecent" :key="i" class="ri"><span>{{r.txt}}</span><b>{{r.sub}}</b></div>
+          </div>
+        </div>
       </div>
 
       <div class="dash-card" style="cursor:pointer" @click="$emit('goto','baby')">
@@ -1304,9 +1460,33 @@ const Sport = {
     function saveW() { if (!(+wform.weight)) return showToast("填体重"); state.weights.push({ id: uid(), weight: +wform.weight, date: wform.date }); state.sportProfile.weight = +wform.weight; wform.show = false; showToast("已记录 ⚖️"); }
     function delW(id) { state.weights = state.weights.filter((x) => x.id !== id); }
     const wlist = computed(() => [...state.weights].sort((a, b) => (b.date < a.date ? -1 : 1)));
-    const wSeries = computed(() => { const pts = [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1)).map((w) => ({ x: new Date(w.date).getTime(), y: w.weight })); return { "体重(kg)": pts }; });
-    const wChartHtml = computed(() => (wSeries.value["体重(kg)"].length ? svgLine(wSeries.value, { "体重(kg)": "#c08457" }, "日期") : ""));
+    const wSeries = computed(() => { const pts = [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1)).map((w) => ({ x: new Date(w.date).getTime(), y: w.weight, id: w.id, tip: w.date + " · " + w.weight + "kg（点击修改）" })); return { "体重(kg)": pts }; });
+    const wChartHtml = computed(() => (wSeries.value["体重(kg)"].length ? svgLine(wSeries.value, { "体重(kg)": "#c08457" }, "日期", { yMin: 40, yMax: 70, dotClick: true, dotClass: "wdot" }) : ""));
     const wTrend = computed(() => { if (wlist.value.length < 2) return null; const latest = +wlist.value[0].weight, prev = +wlist.value[1].weight; return { diff: +(latest - prev).toFixed(1) }; });
+
+    /* 点击曲线圆点 → 查看/修改/删除该次记录（v-html 渲染的 SVG 无法用 @click，走父容器事件委托） */
+    const wedit = reactive({ show: false, id: "", weight: "", date: "" });
+    function onWChartClick(e) {
+      const t = e && e.target;
+      if (!t || t.tagName !== "circle" || !t.classList || !t.classList.contains("wdot")) return;
+      const w = state.weights.find((x) => x.id === t.getAttribute("data-id"));
+      if (!w) return;
+      Object.assign(wedit, { show: true, id: w.id, weight: w.weight, date: w.date });
+    }
+    function saveWEdit() {
+      if (!(+wedit.weight)) return showToast("填体重");
+      const w = state.weights.find((x) => x.id === wedit.id);
+      if (!w) return;
+      w.weight = +wedit.weight;
+      w.date = wedit.date || w.date;
+      state.weights = [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const last = state.weights[state.weights.length - 1];
+      if (last) state.sportProfile.weight = last.weight; // 档案体重跟着最新一条走
+      wedit.show = false; showToast("已更新 ⚖️");
+    }
+    function delWEdit() { state.weights = state.weights.filter((x) => x.id !== wedit.id); wedit.show = false; showToast("已删除"); }
+    // 最新体重不在 40–70 区间时给个提醒（图表会自动扩展范围，不会画丢）
+    const wOutRange = computed(() => state.weights.some((w) => +w.weight < 40 || +w.weight > 70));
 
     const expanded = ref(false);
     const records = computed(() => [...state.sport].sort((a, b) => (b.date < a.date ? -1 : 1)));
@@ -1337,7 +1517,7 @@ const Sport = {
     });
     const today = computed(() => { const r = state.sport.filter((x) => x.date === todayStr()); const burn = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.calories || 0), 0); const dur = r.filter((x) => x.kind === "exercise").reduce((s, x) => s + (+x.duration || 0), 0); const intake = r.filter((x) => x.kind === "food").reduce((s, x) => s + (+x.calories || 0), 0); return { burn, dur, intake, deficit: (state.sportProfile.bmr || 0) + burn - intake }; });
 
-    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, addToMeal, saveMeal, delMealItem, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, mealRows, expanded, toggleExpand, delRows, VISIBLE_ROWS, daily, today, state };
+    return { form, food, prof, actForm, wform, FOODS, bmrNow, search, onKw, doSearch, pick, actName, openAdd, openEditAct, save, openFood, openEditFood, foodCal, saveFood, addToMeal, saveMeal, delMealItem, openProf, saveProf, openAct, saveAct, delAct, delRec, syncCal, openW, saveW, delW, wlist, wChartHtml, wTrend, wedit, onWChartClick, saveWEdit, delWEdit, wOutRange, mealRows, expanded, toggleExpand, delRows, VISIBLE_ROWS, daily, today, state };
   },
   template: `
   <div>
@@ -1383,11 +1563,10 @@ const Sport = {
     </div>
     <div class="card" style="margin-top:14px">
       <div style="font-weight:700;margin-bottom:8px">⚖️ 体重趋势 <span v-if="wTrend" class="tag" :class="wTrend.diff<=0?'green':'red'" style="margin-left:6px">{{wTrend.diff>0?'+':''}}{{wTrend.diff}} kg（较上次）</span></div>
-      <div v-if="wChartHtml" v-html="wChartHtml"></div>
+      <div v-if="wChartHtml" @click="onWChartClick" style="touch-action:manipulation" v-html="wChartHtml"></div>
       <div v-else class="empty" style="padding:16px 0"><span class="big">⚖️</span>记录几次体重，就能看到波动曲线</div>
-      <div v-if="wlist.length" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-        <span v-for="w in wlist.slice(0,8)" :key="w.id" class="tag qing" style="display:inline-flex;align-items:center;gap:5px">{{w.date}} {{w.weight}}kg<button @click="delW(w.id)" style="border:0;background:transparent;color:var(--danger);cursor:pointer;font-size:11px;padding:0">✕</button></span>
-      </div>
+      <div v-if="wChartHtml" style="font-size:12px;color:var(--text-mute);margin-top:2px">点击曲线上的圆点，可查看 / 修改 / 删除该次记录</div>
+      <div v-if="wOutRange" style="font-size:12px;color:var(--danger);margin-top:4px">有记录超出 40–70kg 区间，图表已自动扩展刻度以完整显示</div>
     </div>
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
@@ -1463,6 +1642,14 @@ const Sport = {
     <modal :show="wform.show" :title="'记录体重'" @close="wform.show=false">
       <div class="pl-grid"><div class="field"><label>体重(kg)</label><input class="input" type="number" step="0.1" v-model="wform.weight"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="wform.date"></div></div>
       <div style="text-align:right"><button class="btn" @click="saveW">保存</button></div>
+    </modal>
+
+    <modal :show="wedit.show" :title="'修改体重记录'" @close="wedit.show=false">
+      <div class="pl-grid"><div class="field"><label>体重(kg)</label><input class="input" type="number" step="0.1" v-model="wedit.weight"></div><div class="field"><label>日期</label><input class="input" type="date" v-model="wedit.date"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px">
+        <button class="btn danger" @click="delWEdit">🗑️ 删除这条</button>
+        <button class="btn" @click="saveWEdit">保存</button>
+      </div>
     </modal>
 
     <modal :show="actForm.show" :title="'新增运动项目'" @close="actForm.show=false">
@@ -2358,25 +2545,58 @@ const App = {
       <div class="sidebar-foot">
         <div class="acc-box" v-if="AUTH_ENABLED">
           <button class="acc-main" @click="accOpen=!accOpen">
-            <template v-if="!authState.user">👤 账号与数据 <span class="acc-caret">{{accOpen?'▲':'▼'}}</span></template>
-            <template v-else>👤 {{authState.user.username}} <span class="acc-caret">{{accOpen?'▲':'▼'}}</span></template>
+            <template v-if="!authState.user">
+              <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              账号与数据 <span class="acc-caret">{{accOpen?'▲':'▼'}}</span>
+            </template>
+            <template v-else>
+              <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              {{authState.user.username}} <span class="acc-caret">{{accOpen?'▲':'▼'}}</span>
+            </template>
           </button>
           <div v-if="accOpen" class="acc-btns">
             <template v-if="!authState.user">
-              <button class="btn-ghost" @click="openLogin">🔑 登录</button>
-              <button class="btn-ghost" @click="openRegister">✨ 注册</button>
+              <button class="btn-ghost" @click="openLogin">
+                <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><circle cx="9" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M13 12h8M18 9l3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                登录
+              </button>
+              <button class="btn-ghost" @click="openRegister">
+                <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                注册
+              </button>
             </template>
             <template v-else>
-              <button class="btn-ghost" @click="doSyncNow">☁️ 云端同步</button>
-              <button class="btn-ghost" @click="pwForm.show=true">🔒 改密</button>
-              <button class="btn-ghost" @click="logout">🚪 退出</button>
+              <button class="btn-ghost" @click="doSyncNow">
+                <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M7 18a5 5 0 010-10 6 6 0 0111-1.5M17 18a5 5 0 01-10 0 6 6 0 011-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M21 5v4h-4M3 19v-4h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                云端同步
+              </button>
+              <button class="btn-ghost" @click="pwForm.show=true">
+                <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                改密
+              </button>
+              <button class="btn-ghost" @click="logout">
+                <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M16 8l4 4-4 4M20 12H10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                退出
+              </button>
             </template>
-            <button class="btn-ghost" @click="doExport">💾 导出备份</button>
-            <button class="btn-ghost" @click="triggerImport">📥 导入备份</button>
+            <button class="btn-ghost" @click="doExport">
+              <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              导出备份
+            </button>
+            <button class="btn-ghost" @click="triggerImport">
+              <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              导入备份
+            </button>
           </div>
         </div>
-        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="doExport">⬇️ 导出备份</button>
-        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="triggerImport">⬆️ 导入备份</button>
+        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="doExport">
+          <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          导出备份
+        </button>
+        <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="triggerImport">
+          <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          导入备份
+        </button>
         <input ref="fileInput" type="file" accept="application/json" hidden @change="doImport">
       </div>
     </aside>
