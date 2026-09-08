@@ -12,7 +12,7 @@ const LS = {
 };
 
 /* 工作台全部数据键（本地 / 云端共用同一份结构） */
-const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast"];
+const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats"];
 
 /* 纯本地使用：数据存浏览器 localStorage，无需登录账号 */
 
@@ -90,7 +90,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de", workbench: "icons/工作台.svg?v=20260908dn" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* SVG 环形图 */
@@ -178,6 +178,8 @@ const state = reactive({
   expressStart: "",
   brainBest: null,
   brainLast: null,
+  workbench: [],
+  workbenchCats: [],
 });
 
 const SLOGANS = ["今天也要好好生活 🌿", "慢慢来，比较快", "把日子过成自己喜欢的样子", "一草一木，皆是生活", "记录，是对生活最好的回应", "微小而确定的幸福", "好好吃饭，好好睡觉，好好爱你", "日子清净，抬头见喜"];
@@ -227,7 +229,7 @@ function syncPlanTasks() {
     const o = old[key];
     out.push({ id: o ? o.id : uid(), title, short: short || (o && o.short) || "", note, due, priority: "普通", done: o ? !!o.done : false, src, srcId, createdAt: o ? o.createdAt : Date.now() });
   };
-  state.memos.forEach((m) => { if (m.syncTask && m.due) add("memo:" + m.id, "memo", m.id, "📝 " + (m.title || "备忘"), m.content ? m.content.slice(0, 40) : "", m.due, m.title ? m.title.slice(0, 8) : "备忘"); });
+  state.memos.forEach((m) => { if (m.syncTask && m.due) add("memo:" + m.id, "memo", m.id, "📝 " + (m.title || "记录"), m.content ? m.content.slice(0, 40) : "", m.due, m.title ? m.title.slice(0, 8) : "记录"); });
   state.anniv.forEach((a) => {
     if (!a.date) return;
     const due = annivTargetDate(a); // 与倒计时口径一致：农历不重复按所选农历年、公历不重复按固定日
@@ -352,7 +354,7 @@ async function authChangePw(newPassword) {
 function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
 function setLastSync(t) { if (authState.user) localStorage.setItem("lifeWB:lastSync:" + authState.user.id, t || ""); }
 /* 用户真正录入的数据 key（不含 sportActs/sportProfile/babyProfile 等内置或默认结构，避免误判"云端有数据"） */
-const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast"];
+const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats"];
 function localHasData() {
   return USER_DATA_KEYS.some((k) => {
     const v = state[k];
@@ -536,6 +538,7 @@ const Dashboard = {
       { key: "plants", ico: "plants", name: "植物", num: plantsTotal.value + " 株", badge: plantsNeed.value || 0 },
       { key: "sport", ico: "sport", name: "运动", num: "已消耗 " + sportToday.value.burn + " kcal", badge: 0 },
       { key: "baby", ico: "baby", name: "宝宝", num: babyCount.value + " 条记录", badge: 0 },
+      { key: "workbench", ico: "workbench", name: "工作台", num: (state.workbench ? state.workbench.length : 0) + " 个网址", badge: 0 },
     ]));
 
     /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
@@ -857,7 +860,7 @@ const Tasks = {
 };
 
 /* =========================================================
-   组件：备忘录（自定义分类）
+   组件：记录生活（原备忘录，自定义分类）
    ========================================================= */
 const Memo = {
   components: { Modal },
@@ -865,7 +868,7 @@ const Memo = {
     const filter = ref("全部");
     const kw = ref("");
     const manage = ref(false);
-    const form = reactive({ show: false, title: "新建备忘", id: null, name: "", content: "", catId: "", pinned: false, due: "", syncTask: false });
+    const form = reactive({ show: false, title: "新建记录", id: null, name: "", content: "", catId: "", pinned: false, due: "", syncTask: false });
     const catForm = reactive({ show: false, title: "分类", id: null, name: "" });
 
     const catName = (id) => { const c = state.memoCats.find((x) => x.id === id); return c ? c.name : "未分类"; };
@@ -875,8 +878,8 @@ const Memo = {
       if (kw.value) r = r.filter((m) => (m.title + m.content).toLowerCase().includes(kw.value.toLowerCase()));
       return r.sort((a, b) => (b.pinned - a.pinned) || (b.createdAt - a.createdAt));
     });
-    function openAdd() { const def = state.memoCats[0] ? state.memoCats[0].id : ""; Object.assign(form, { show: true, title: "新建备忘", id: null, name: "", content: "", catId: def, pinned: false, due: "", syncTask: false }); }
-    function openEdit(m) { Object.assign(form, { show: true, title: "编辑备忘", id: m.id, name: m.title, content: m.content, catId: m.catId || "", pinned: !!m.pinned, due: m.due || "", syncTask: !!m.syncTask }); }
+    function openAdd() { const def = state.memoCats[0] ? state.memoCats[0].id : ""; Object.assign(form, { show: true, title: "新建记录", id: null, name: "", content: "", catId: def, pinned: false, due: "", syncTask: false }); }
+    function openEdit(m) { Object.assign(form, { show: true, title: "编辑记录", id: m.id, name: m.title, content: m.content, catId: m.catId || "", pinned: !!m.pinned, due: m.due || "", syncTask: !!m.syncTask }); }
     function save() { if (!form.name.trim()) return showToast("标题不能为空");
       if (form.id) { const m = state.memos.find((x) => x.id === form.id); Object.assign(m, { title: form.name.trim(), content: form.content.trim(), catId: form.catId, pinned: form.pinned, due: form.due, syncTask: form.syncTask }); }
       else state.memos.push({ id: uid(), title: form.name.trim(), content: form.content.trim(), catId: form.catId, pinned: form.pinned, due: form.due, syncTask: form.syncTask, createdAt: Date.now() });
@@ -889,14 +892,19 @@ const Memo = {
       if (catForm.id) { const c = state.memoCats.find((x) => x.id === catForm.id); c.name = catForm.name.trim(); }
       else state.memoCats.push({ id: uid(), name: catForm.name.trim() });
       catForm.show = false; }
-    function delCat(id) { state.memoCats = state.memoCats.filter((x) => x.id !== id); state.memos.forEach((m) => { if (m.catId === id) m.catId = ""; }); showToast("分类已删除，相关备忘归入未分类"); }
-    return { filter, kw, manage, form, catForm, catName, list, openAdd, openEdit, save, del, pin, openCatAdd, openCatEdit, saveCat, delCat, state };
+    function delCat(id) { state.memoCats = state.memoCats.filter((x) => x.id !== id); state.memos.forEach((m) => { if (m.catId === id) m.catId = ""; }); showToast("分类已删除，相关记录归入未分类"); }
+    /* 点击查看完整内容（卡片固定高度，长内容截断显示） */
+    const detail = reactive({ show: false, m: null });
+    function openDetail(m) { detail.m = m; detail.show = true; }
+    function delFromDetail() { if (detail.m) del(detail.m.id); detail.show = false; }
+    function editFromDetail() { const m = detail.m; detail.show = false; if (m) openEdit(m); }
+    return { filter, kw, manage, form, catForm, catName, list, openAdd, openEdit, save, del, pin, openCatAdd, openCatEdit, saveCat, delCat, detail, openDetail, delFromDetail, editFromDetail, state };
   },
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('memo')"></span>备忘录</div><div class="module-desc">碎片化记录，按分类归档</div></div>
-      <div style="display:flex;gap:8px"><button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button><button class="btn" @click="openAdd">＋ 新建备忘</button></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('memo')"></span>记录生活</div><div class="module-desc">碎片化记录，按分类归档（点击卡片看完整内容）</div></div>
+      <div style="display:flex;gap:8px"><button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button><button class="btn" @click="openAdd">＋ 新建记录</button></div>
     </div>
     <div class="toolbar">
       <input class="input search" v-model="kw" placeholder="🔍 搜索标题或内容">
@@ -908,18 +916,25 @@ const Memo = {
       <button v-if="manage" class="chip" @click="openCatAdd">＋ 分类</button>
     </div>
     <div class="grid cards-auto">
-      <div class="card" v-for="m in list" :key="m.id" style="position:relative">
-        <span v-if="m.pinned" class="due-flag tag warn">📌 置顶</span>
-        <div style="font-weight:700;font-size:15px;padding-right:54px">{{m.title}}</div>
-        <div style="color:var(--text-soft);font-size:13px;white-space:pre-wrap;word-break:break-word;margin-top:4px">{{m.content}}</div>
-        <div class="meta" style="margin-top:10px"><span class="tag blue">{{catName(m.catId)}}</span><span>🕒 {{fmtDate(m.createdAt)}}</span><span v-if="m.due" class="tag warn">📅 {{m.due}}</span><span v-if="m.syncTask&&m.due" class="tag green">↔ 已同步</span></div>
-        <div class="ops" style="position:absolute;bottom:14px;right:14px;display:flex;gap:6px">
-          <button class="icon-btn" @click="pin(m)" title="置顶">📌</button>
-          <button class="icon-btn" @click="openEdit(m)" title="编辑">✏️</button>
-          <button class="icon-btn danger" @click="del(m.id)" title="删除">🗑️</button>
+      <div class="card memo-card" v-for="m in list" :key="m.id" @click="openDetail(m)">
+        <div class="mc-head">
+          <div class="mc-title">{{m.title}}</div>
+          <span v-if="m.pinned" class="mc-pin">📌</span>
+        </div>
+        <div class="mc-body">{{m.content || '（无内容）'}}</div>
+        <div class="mc-foot">
+          <span class="tag blue">{{catName(m.catId)}}</span>
+          <span class="mc-date">🕒 {{fmtDate(m.createdAt)}}</span>
+          <span v-if="m.due" class="tag warn">📅 {{m.due}}</span>
+          <span v-if="m.syncTask&&m.due" class="tag green" title="已同步到日程管理">↔</span>
+          <span class="mc-ops" @click.stop>
+            <button class="icon-btn" @click.stop="pin(m)" title="置顶">📌</button>
+            <button class="icon-btn" @click.stop="openEdit(m)" title="编辑">✏️</button>
+            <button class="icon-btn danger" @click.stop="del(m.id)" title="删除">🗑️</button>
+          </span>
         </div>
       </div>
-      <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🗒️</span>还没有备忘</div>
+      <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🗒️</span>还没有记录，点右上角新建一条吧</div>
     </div>
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
@@ -934,6 +949,176 @@ const Memo = {
 
     <modal :show="catForm.show" :title="catForm.title" @close="catForm.show=false">
       <div class="field"><label>分类名称</label><input class="input" v-model="catForm.name" placeholder="如：生活琐事 / 购物清单"></div>
+      <div style="text-align:right"><button class="btn" @click="saveCat">保存</button></div>
+    </modal>
+
+    <modal :show="detail.show" :title="detail.m ? detail.m.title : '记录详情'" @close="detail.show=false">
+      <div v-if="detail.m">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <span class="tag blue">{{catName(detail.m.catId)}}</span>
+          <span v-if="detail.m.pinned" class="tag warn">📌 置顶</span>
+          <span v-if="detail.m.due" class="tag warn">📅 {{detail.m.due}}</span>
+          <span v-if="detail.m.syncTask&&detail.m.due" class="tag green">↔ 已同步到日程管理</span>
+          <span style="font-size:12px;color:var(--text-mute);margin-left:auto">🕒 {{fmtDate(detail.m.createdAt)}}</span>
+        </div>
+        <div style="white-space:pre-wrap;word-break:break-word;line-height:1.8;color:var(--text-soft)">{{detail.m.content || '（无内容）'}}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:18px">
+          <button class="btn danger" @click="delFromDetail">🗑️ 删除</button>
+          <div style="display:flex;gap:8px"><button class="btn gray" @click="detail.show=false">关闭</button><button class="btn" @click="editFromDetail">✏️ 编辑</button></div>
+        </div>
+      </div>
+    </modal>
+  </div>`,
+};
+
+/* =========================================================
+   组件：工作台（常用网站快捷入口，自定义分类 + 位置排序）
+   ========================================================= */
+const Workbench = {
+  components: { Modal },
+  setup() {
+    const WB_COLORS = ["#E07A99", "#7FA8D9", "#5FA98A", "#D99A4E", "#B08FD0", "#4FA3A5", "#C98B8B", "#8C9BD9", "#D98FB0", "#9AB567"];
+    const filter = ref("全部");
+    const kw = ref("");
+    const manage = ref(false);    // 分类管理
+    const sortMode = ref(false);  // 位置排序模式
+    const form = reactive({ show: false, title: "添加网址", id: null, name: "", url: "", cat: "", emoji: "" });
+    const catForm = reactive({ show: false, title: "新增分类", id: null, name: "" });
+
+    const cats = computed(() => state.workbenchCats || []);
+    const list = computed(() => {
+      let r = state.workbench || [];
+      if (filter.value !== "全部") r = r.filter((w) => (w.cat || "未分类") === filter.value);
+      if (kw.value) r = r.filter((w) => ((w.name || "") + (w.url || "")).toLowerCase().includes(kw.value.toLowerCase()));
+      return r;
+    });
+
+    function openAdd() {
+      const def = filter.value !== "全部" ? filter.value : (cats.value[0] ? cats.value[0].name : "");
+      Object.assign(form, { show: true, title: "添加网址", id: null, name: "", url: "", cat: def, emoji: "" });
+    }
+    function openEdit(w) { Object.assign(form, { show: true, title: "编辑网址", id: w.id, name: w.name, url: w.url, cat: w.cat || "", emoji: w.emoji || "" }); }
+    function save() {
+      if (!form.name.trim()) return showToast("填名称");
+      let url = (form.url || "").trim();
+      if (!url) return showToast("填链接");
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url; // 没写协议自动补 https
+      const cat = form.cat || "";
+      const emoji = (form.emoji || "").trim();
+      if (form.id) { const w = state.workbench.find((x) => x.id === form.id); if (w) Object.assign(w, { name: form.name.trim(), url, cat, emoji }); }
+      else state.workbench.push({ id: uid(), name: form.name.trim(), url, cat, emoji, createdAt: Date.now() });
+      form.show = false; showToast("已保存 🔗");
+    }
+    function del(id) { state.workbench = (state.workbench || []).filter((x) => x.id !== id); showToast("已删除"); }
+    function openIt(w) { if (w && w.url) window.open(w.url, "_blank", "noopener"); }
+
+    /* 位置调整：在当前显示顺序里与相邻项交换（过滤状态下也按看到的顺序生效） */
+    function move(id, dir) {
+      const cur = list.value;
+      const i = cur.findIndex((x) => x.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= cur.length) return;
+      const a = state.workbench.findIndex((x) => x.id === cur[i].id);
+      const b = state.workbench.findIndex((x) => x.id === cur[j].id);
+      if (a < 0 || b < 0) return;
+      const t = state.workbench[a]; state.workbench[a] = state.workbench[b]; state.workbench[b] = t;
+      state.workbench = [...state.workbench];
+    }
+    function isFirst(id) { return list.value.findIndex((x) => x.id === id) <= 0; }
+    function isLast(id) { const i = list.value.findIndex((x) => x.id === id); return i < 0 || i >= list.value.length - 1; }
+
+    function openCatAdd() { Object.assign(catForm, { show: true, title: "新增分类", id: null, name: "" }); }
+    function openCatEdit(c) { Object.assign(catForm, { show: true, title: "重命名分类", id: c.id, name: c.name }); }
+    function saveCat() {
+      if (!catForm.name.trim()) return showToast("填分类名");
+      const nm = catForm.name.trim();
+      if (catForm.id) {
+        const c = state.workbenchCats.find((x) => x.id === catForm.id);
+        const old = c ? c.name : "";
+        if (c) c.name = nm;
+        (state.workbench || []).forEach((w) => { if ((w.cat || "") === old) w.cat = nm; });
+      } else state.workbenchCats.push({ id: uid(), name: nm });
+      catForm.show = false;
+    }
+    function delCat(id) {
+      const c = state.workbenchCats.find((x) => x.id === id);
+      const nm = c ? c.name : "";
+      state.workbenchCats = (state.workbenchCats || []).filter((x) => x.id !== id);
+      (state.workbench || []).forEach((w) => { if ((w.cat || "") === nm) w.cat = ""; });
+      if (filter.value === nm) filter.value = "全部";
+      showToast("分类已删除，相关网址归入未分类");
+    }
+    function moveCat(id, dir) {
+      const arr = state.workbenchCats || [];
+      const i = arr.findIndex((x) => x.id === id); const j = i + dir;
+      if (i < 0 || j < 0 || j >= arr.length) return;
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+      state.workbenchCats = [...arr];
+    }
+
+    /* 图标：填了 emoji 用 emoji，否则取名称首字 + 稳定配色 */
+    function icoOf(w) { const e = (w.emoji || "").trim(); if (e) return e.slice(0, 2); return ((w.name || "?").trim().charAt(0) || "?").toUpperCase(); }
+    function bgOf(w) { const s = (w.name || "") + (w.url || ""); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return WB_COLORS[h % WB_COLORS.length]; }
+    function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return (u || "").replace(/^https?:\/\//, "").slice(0, 30); } }
+
+    return { filter, kw, manage, sortMode, form, catForm, cats, list, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, state };
+  },
+  template: `
+  <div>
+    <div class="module-head">
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('workbench')"></span>工作台</div><div class="module-desc">常用网站快捷入口，点击卡片直接跳转</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn gray" @click="sortMode=!sortMode">{{sortMode?'完成排序':'⇅ 调整位置'}}</button>
+        <button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button>
+        <button class="btn" @click="openAdd">＋ 添加网址</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input class="input search" v-model="kw" placeholder="🔍 搜索名称或网址">
+      <button class="chip" :class="{active:filter==='全部'}" @click="filter='全部'">全部</button>
+      <button class="chip" v-for="c in cats" :key="c.id" :class="{active:filter===c.name}" @click="filter=c.name">{{c.name}}
+        <span v-if="manage" style="margin-left:4px" @click.stop="moveCat(c.id,-1)" title="前移">←</span>
+        <span v-if="manage" style="margin-left:3px" @click.stop="moveCat(c.id,1)" title="后移">→</span>
+        <span v-if="manage" style="margin-left:3px" @click.stop="openCatEdit(c)">✎</span>
+        <span v-if="manage" style="margin-left:2px;color:var(--danger)" @click.stop="delCat(c.id)">✕</span>
+      </button>
+      <button v-if="manage" class="chip" @click="openCatAdd">＋ 分类</button>
+    </div>
+    <div v-if="sortMode" style="font-size:12px;color:var(--text-mute);margin:-4px 0 10px">排序模式：用 ▲▼ 调整位置（按当前显示顺序生效），点卡片仍可打开网站。</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
+      <div class="wb-card" v-for="w in list" :key="w.id" @click="openIt(w)">
+        <span class="wb-ico" :style="{background:bgOf(w)}">{{icoOf(w)}}</span>
+        <div class="wb-main">
+          <div class="wb-name">{{w.name}}</div>
+          <div class="wb-url">{{hostOf(w.url)}}</div>
+        </div>
+        <div class="wb-ops" @click.stop>
+          <span v-if="sortMode" class="wb-move">
+            <button @click.stop="move(w.id,-1)" :disabled="isFirst(w.id)" title="上移">▲</button>
+            <button @click.stop="move(w.id,1)" :disabled="isLast(w.id)" title="下移">▼</button>
+          </span>
+          <template v-else>
+            <button class="icon-btn" @click.stop="openEdit(w)" title="编辑">✏️</button>
+            <button class="icon-btn danger" @click.stop="del(w.id)" title="删除">🗑️</button>
+          </template>
+        </div>
+      </div>
+      <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🧰</span>还没有网址，点右上角「添加网址」放第一个吧</div>
+    </div>
+
+    <modal :show="form.show" :title="form.title" @close="form.show=false">
+      <div class="field"><label>名称</label><input class="input" v-model="form.name" placeholder="如：公司邮箱 / 项目管理后台"></div>
+      <div class="field"><label>链接</label><input class="input" v-model="form.url" placeholder="如：mail.qq.com 或 https://xxx.com"></div>
+      <div class="pl-grid">
+        <div class="field"><label>分类</label><select class="select" v-model="form.cat"><option value="">未分类</option><option v-for="c in cats" :key="c.id" :value="c.name">{{c.name}}</option></select></div>
+        <div class="field"><label>图标（可选）</label><input class="input" v-model="form.emoji" placeholder="填个 emoji，如 📊"></div>
+      </div>
+      <div class="hint" style="margin:-2px 0 10px">链接不用写 https://，会自动补全；不填图标则用名称首字生成彩色图标。</div>
+      <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
+    </modal>
+
+    <modal :show="catForm.show" :title="catForm.title" @close="catForm.show=false">
+      <div class="field"><label>分类名称</label><input class="input" v-model="catForm.name" placeholder="如：常用工具 / 内部系统"></div>
       <div style="text-align:right"><button class="btn" @click="saveCat">保存</button></div>
     </modal>
   </div>`,
@@ -2366,14 +2551,15 @@ const Brain = {
    根组件
    ========================================================= */
 const App = {
-  components: { Dashboard, Tasks, Memo, Plants, Sport, Finance, Anniv, Baby, Express, Brain },
+  components: { Dashboard, Tasks, Memo, Workbench, Plants, Sport, Finance, Anniv, Baby, Express, Brain },
   setup() {
     const current = ref("home");
     const menuOpen = ref(false); // 移动端抽屉菜单
     const nav = [
       { key: "home", ico: "home", name: "首页" },
       { key: "tasks", ico: "tasks", name: "日程管理" },
-      { key: "memo", ico: "memo", name: "备忘录" },
+      { key: "memo", ico: "memo", name: "记录生活" },
+      { key: "workbench", ico: "workbench", name: "工作台" },
       { key: "anniv", ico: "anniv", name: "纪念日" },
       { key: "finance", ico: "finance", name: "理财管理" },
       { key: "sport", ico: "sport", name: "减脂管理" },
@@ -2382,7 +2568,7 @@ const App = {
       { key: "express", ico: "express", name: "表达能力" },
       { key: "brain", ico: "brain", name: "前额叶训练" },
     ];
-    const compMap = { home: "dashboard", tasks: "tasks", memo: "memo", plants: "plants", sport: "sport", finance: "finance", anniv: "anniv", baby: "baby", express: "express", brain: "brain" };
+    const compMap = { home: "dashboard", tasks: "tasks", memo: "memo", workbench: "workbench", plants: "plants", sport: "sport", finance: "finance", anniv: "anniv", baby: "baby", express: "express", brain: "brain" };
     const badges = computed(() => ({ tasks: state.tasks.filter((t) => !t.done && (!t.due || t.due < todayStr()) ? false : !t.done).length, plants: state.plants.filter((p) => (p.lastWater ? dayDiff(addDays(p.lastWater, plantWaterDays(p)), todayStr()) : 0) <= 0 || (p.lastFertilize ? dayDiff(addDays(p.lastFertilize, p.fertilizeInterval || 30), todayStr()) : 0) <= 0).length }));
     const todayLabel = todayStr() + " 周" + "日一二三四五六"[new Date().getDay()];
     function goto(k) { current.value = k; menuOpen.value = false; }
@@ -2654,6 +2840,7 @@ app.component("tasks", Tasks);
 app.component("memo", Memo);
 app.component("plants", Plants);
 app.component("sport", Sport);
+app.component("workbench", Workbench);
 app.component("finance", Finance);
 app.component("anniv", Anniv);
 app.component("baby", Baby);
