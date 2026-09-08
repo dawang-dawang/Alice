@@ -469,8 +469,36 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .wb-move button { border: 1px solid var(--border); background: #fffdf9; border-radius: 6px; width: 22px; height: 15px; font-size: 9px; line-height: 1; display: grid; place-items: center; color: var(--text-soft); }
 .wb-move button:hover:not(:disabled) { border-color: var(--accent); color: var(--green-deep); background: var(--green-soft); }
 .wb-move button:disabled { opacity: .3; cursor: default; }
+
+/* 工作台：分类分栏 */
+.wb-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.wb-col { background: linear-gradient(180deg, #fffdf8, #fffaf2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px 12px; }
+.wb-col-head { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+.wb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.wb-col-name { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-col-num { font-size: 11px; color: var(--text-mute); background: #fdf4e8; border-radius: 9px; padding: 1px 7px; }
+.wb-col-ops { margin-left: auto; display: flex; gap: 3px; flex-shrink: 0; }
+.wb-list { display: flex; flex-direction: column; gap: 8px; }
+.wb-col-empty { font-size: 12px; color: var(--text-mute); text-align: center; padding: 14px 0; border: 1px dashed var(--border); border-radius: 10px; }
+.wb-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+.wb-line { display: flex; align-items: center; gap: 5px; font-size: 11.5px; line-height: 1.5; }
+.wb-k { color: var(--text-mute); flex-shrink: 0; }
+.wb-v { color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-note { max-width: 100%; }
+.wb-mini { border: 1px solid var(--border); background: #fffdf9; border-radius: 6px; height: 18px; min-width: 18px; padding: 0 3px; font-size: 10px; line-height: 1; display: grid; place-items: center; color: var(--text-soft); cursor: pointer; }
+.wb-mini:hover { border-color: var(--accent); color: var(--green-deep); background: var(--green-soft); }
+.wb-mini.danger:hover { border-color: var(--danger); color: var(--danger); background: #fdeef0; }
+/* 图标库 */
+.wb-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 5px; max-height: 168px; overflow-y: auto; margin-top: 9px; padding: 9px; background: #fffdf8; border: 1px solid var(--border); border-radius: 10px; }
+.wb-pick { border: 1px solid transparent; background: #fff; border-radius: 8px; height: 34px; font-size: 17px; cursor: pointer; display: grid; place-items: center; }
+.wb-pick:hover { background: var(--green-soft); }
+.wb-pick.on { border-color: var(--accent); background: #fdeef3; }
+.wb-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.wb-swatch.on { border-color: var(--text-soft); box-shadow: 0 0 0 2px #fff inset; }
 @media (max-width: 640px) {
   .memo-card { height: 178px; }
   .mc-body { -webkit-line-clamp: 4; }
+  .wb-cols { grid-template-columns: 1fr; gap: 12px; }
+  .wb-picker { grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); max-height: 140px; }
 }
 
