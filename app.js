@@ -978,11 +978,14 @@ const Workbench = {
   components: { Modal },
   setup() {
     const WB_COLORS = ["#E07A99", "#7FA8D9", "#5FA98A", "#D99A4E", "#B08FD0", "#4FA3A5", "#C98B8B", "#8C9BD9", "#D98FB0", "#9AB567"];
+    const WB_EMOJIS = ["🧰", "🔗", "🌐", "🖥️", "💻", "☁️", "📊", "📈", "📉", "📁", "🗂️", "📂", "📝", "🗒️", "📌", "📎", "🗓️", "📅", "📧", "✉️", "📮", "💬", "📞", "🤖", "🧠", "⚙️", "🛠️", "🔧", "🔍", "🔎", "🚀", "⚡", "🎯", "🏆", "💡", "🔐", "🔑", "🛡️", "👤", "👥", "🏢", "🏭", "🏦", "💰", "🧾", "🛒", "🎫", "🎓", "🏥", "🩺", "🍼", "🌱", "🏠", "🚗", "🗺️", "📍", "🧭", "⏰", "🔔", "🎵", "🎬", "📷", "🎮", "📚", "🧮", "🖊️", "🖨️", "📦", "🏷️", "♻️", "⭐", "❤️", "🍀", "🌈", "✅"];
     const filter = ref("全部");
     const kw = ref("");
     const manage = ref(false);    // 分类管理
     const sortMode = ref(false);  // 位置排序模式
-    const form = reactive({ show: false, title: "添加网址", id: null, name: "", url: "", cat: "", emoji: "" });
+    const pickOpen = ref(false);  // 图标选择面板
+    const shown = reactive({});   // 密码明文展示状态 { id: true }
+    const form = reactive({ show: false, title: "添加网址", id: null, name: "", url: "", cat: "", emoji: "", color: "", account: "", password: "", note: "" });
     const catForm = reactive({ show: false, title: "新增分类", id: null, name: "" });
 
     const cats = computed(() => state.workbenchCats || []);
@@ -992,29 +995,52 @@ const Workbench = {
       if (kw.value) r = r.filter((w) => ((w.name || "") + (w.url || "")).toLowerCase().includes(kw.value.toLowerCase()));
       return r;
     });
+    /* 分栏：每个分类一栏（未分类放最后），搜索时隐藏无匹配的栏 */
+    const groups = computed(() => {
+      const kwv = kw.value.trim().toLowerCase();
+      const all = state.workbench || [];
+      const match = (w) => !kwv || ((w.name || "") + (w.url || "") + (w.account || "") + (w.note || "")).toLowerCase().includes(kwv);
+      const names = filter.value === "全部" ? cats.value.map((c) => c.name) : [filter.value];
+      const out = names.map((n) => ({ name: n, items: all.filter((w) => (w.cat || "未分类") === n && match(w)) }));
+      if (filter.value === "全部") {
+        const un = all.filter((w) => !(w.cat || "")) ;
+        if (un.length || !kwv) out.push({ name: "未分类", items: un.filter(match) });
+      }
+      return out.filter((g) => g.items.length || !kwv);
+    });
+    /* 分组颜色：按分类名稳定取色 */
+    function groupColor(n) { let h = 0; for (let i = 0; i < (n || "").length; i++) h = (h * 131 + n.charCodeAt(i)) >>> 0; return WB_COLORS[h % WB_COLORS.length]; }
 
     function openAdd() {
       const def = filter.value !== "全部" ? filter.value : (cats.value[0] ? cats.value[0].name : "");
-      Object.assign(form, { show: true, title: "添加网址", id: null, name: "", url: "", cat: def, emoji: "" });
+      Object.assign(form, { show: true, title: "添加网址", id: null, name: "", url: "", cat: def, emoji: "", color: "", account: "", password: "", note: "" });
+      pickOpen.value = false;
     }
-    function openEdit(w) { Object.assign(form, { show: true, title: "编辑网址", id: w.id, name: w.name, url: w.url, cat: w.cat || "", emoji: w.emoji || "" }); }
+    function openEdit(w) {
+      Object.assign(form, { show: true, title: "编辑网址", id: w.id, name: w.name || "", url: w.url || "", cat: w.cat || "", emoji: w.emoji || "", color: w.color || "", account: w.account || "", password: w.password || "", note: w.note || "" });
+      pickOpen.value = false;
+    }
     function save() {
       if (!form.name.trim()) return showToast("填名称");
       let url = (form.url || "").trim();
       if (!url) return showToast("填链接");
       if (!/^https?:\/\//i.test(url)) url = "https://" + url; // 没写协议自动补 https
-      const cat = form.cat || "";
-      const emoji = (form.emoji || "").trim();
-      if (form.id) { const w = state.workbench.find((x) => x.id === form.id); if (w) Object.assign(w, { name: form.name.trim(), url, cat, emoji }); }
-      else state.workbench.push({ id: uid(), name: form.name.trim(), url, cat, emoji, createdAt: Date.now() });
+      const data = { name: form.name.trim(), url, cat: form.cat || "", emoji: (form.emoji || "").trim(), color: form.color || "", account: (form.account || "").trim(), password: form.password || "", note: (form.note || "").trim() };
+      if (form.id) { const w = state.workbench.find((x) => x.id === form.id); if (w) Object.assign(w, data); }
+      else state.workbench.push(Object.assign({ id: uid(), createdAt: Date.now() }, data));
       form.show = false; showToast("已保存 🔗");
     }
     function del(id) { state.workbench = (state.workbench || []).filter((x) => x.id !== id); showToast("已删除"); }
     function openIt(w) { if (w && w.url) window.open(w.url, "_blank", "noopener"); }
 
-    /* 位置调整：在当前显示顺序里与相邻项交换（过滤状态下也按看到的顺序生效） */
-    function move(id, dir) {
-      const cur = list.value;
+    /* 位置调整：在所属栏内与相邻项交换（按看到的顺序生效） */
+    function groupItems(name) {
+      const all = state.workbench || [];
+      const kwv = kw.value.trim().toLowerCase();
+      return all.filter((w) => (w.cat || "未分类") === name && (!kwv || ((w.name || "") + (w.url || "") + (w.account || "") + (w.note || "")).toLowerCase().includes(kwv)));
+    }
+    function move(id, dir, name) {
+      const cur = groupItems(name);
       const i = cur.findIndex((x) => x.id === id);
       const j = i + dir;
       if (i < 0 || j < 0 || j >= cur.length) return;
@@ -1024,8 +1050,27 @@ const Workbench = {
       const t = state.workbench[a]; state.workbench[a] = state.workbench[b]; state.workbench[b] = t;
       state.workbench = [...state.workbench];
     }
-    function isFirst(id) { return list.value.findIndex((x) => x.id === id) <= 0; }
-    function isLast(id) { const i = list.value.findIndex((x) => x.id === id); return i < 0 || i >= list.value.length - 1; }
+    function isFirst(id, name) { return groupItems(name).findIndex((x) => x.id === id) <= 0; }
+    function isLast(id, name) { const c = groupItems(name); const i = c.findIndex((x) => x.id === id); return i < 0 || i >= c.length - 1; }
+
+    /* 密码：显示切换 + 一键复制 */
+    function toggleShow(id) { shown[id] = !shown[id]; }
+    function copyText(t, label) {
+      if (!t) return;
+      const done = () => showToast((label || "内容") + "已复制 ✓");
+      try {
+        if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done)); }
+        else fallbackCopy(t, done);
+      } catch (e) { fallbackCopy(t, done); }
+    }
+    function fallbackCopy(t, done) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = t; ta.style.position = "fixed"; ta.style.top = "-999px"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+        done();
+      } catch (e) { showToast("复制失败，请手动选中复制"); }
+    }
 
     function openCatAdd() { Object.assign(catForm, { show: true, title: "新增分类", id: null, name: "" }); }
     function openCatEdit(c) { Object.assign(catForm, { show: true, title: "重命名分类", id: c.id, name: c.name }); }
@@ -1056,12 +1101,15 @@ const Workbench = {
       state.workbenchCats = [...arr];
     }
 
-    /* 图标：填了 emoji 用 emoji，否则取名称首字 + 稳定配色 */
+    /* 图标：填了 emoji 用 emoji，否则取名称首字；颜色优先用自选色，否则按名称稳定取色 */
     function icoOf(w) { const e = (w.emoji || "").trim(); if (e) return e.slice(0, 2); return ((w.name || "?").trim().charAt(0) || "?").toUpperCase(); }
-    function bgOf(w) { const s = (w.name || "") + (w.url || ""); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return WB_COLORS[h % WB_COLORS.length]; }
-    function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return (u || "").replace(/^https?:\/\//, "").slice(0, 30); } }
+    function bgOf(w) { if (w.color) return w.color; const s = (w.name || "") + (w.url || ""); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return WB_COLORS[h % WB_COLORS.length]; }
+    function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return (u || "").replace(/^https?:\/\//, "").slice(0, 34); } }
+    function pickIcon(e) { form.emoji = e; pickOpen.value = false; }
+    function clearIcon() { form.emoji = ""; form.color = ""; pickOpen.value = false; }
+    function catOf(name) { return (state.workbenchCats || []).find((c) => c.name === name) || null; }
 
-    return { filter, kw, manage, sortMode, form, catForm, cats, list, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, state };
+    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
   },
   template: `
   <div>
@@ -1084,36 +1132,83 @@ const Workbench = {
       </button>
       <button v-if="manage" class="chip" @click="openCatAdd">＋ 分类</button>
     </div>
-    <div v-if="sortMode" style="font-size:12px;color:var(--text-mute);margin:-4px 0 10px">排序模式：用 ▲▼ 调整位置（按当前显示顺序生效），点卡片仍可打开网站。</div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
-      <div class="wb-card" v-for="w in list" :key="w.id" @click="openIt(w)">
-        <span class="wb-ico" :style="{background:bgOf(w)}">{{icoOf(w)}}</span>
-        <div class="wb-main">
-          <div class="wb-name">{{w.name}}</div>
-          <div class="wb-url">{{hostOf(w.url)}}</div>
-        </div>
-        <div class="wb-ops" @click.stop>
-          <span v-if="sortMode" class="wb-move">
-            <button @click.stop="move(w.id,-1)" :disabled="isFirst(w.id)" title="上移">▲</button>
-            <button @click.stop="move(w.id,1)" :disabled="isLast(w.id)" title="下移">▼</button>
+    <div v-if="sortMode" style="font-size:12px;color:var(--text-mute);margin:-4px 0 10px">排序模式：用 ▲▼ 在所属分类栏内调整位置，点卡片仍可打开网站。</div>
+    <div v-if="!state.workbench.length" class="empty" style="padding:26px 0"><span class="big">🧰</span>还没有网址，点右上角「添加网址」放第一个吧</div>
+    <div v-else-if="!groups.length" class="empty" style="padding:26px 0"><span class="big">🔍</span>没有匹配的网址，换个词试试</div>
+    <div v-else class="wb-cols">
+      <section class="wb-col" v-for="g in groups" :key="g.name">
+        <div class="wb-col-head">
+          <span class="wb-dot" :style="{background:groupColor(g.name)}"></span>
+          <span class="wb-col-name">{{g.name}}</span>
+          <span class="wb-col-num">{{g.items.length}}</span>
+          <span class="wb-col-ops" v-if="manage && catOf(g.name)">
+            <button class="wb-mini" @click="moveCat(catOf(g.name).id,-1)" title="整栏前移">←</button>
+            <button class="wb-mini" @click="moveCat(catOf(g.name).id,1)" title="整栏后移">→</button>
+            <button class="wb-mini" @click="openCatEdit(catOf(g.name))" title="重命名">✎</button>
+            <button class="wb-mini danger" @click="delCat(catOf(g.name).id)" title="删除分类">✕</button>
           </span>
-          <template v-else>
-            <button class="icon-btn" @click.stop="openEdit(w)" title="编辑">✏️</button>
-            <button class="icon-btn danger" @click.stop="del(w.id)" title="删除">🗑️</button>
-          </template>
         </div>
-      </div>
-      <div v-if="!list.length" class="empty" style="grid-column:1/-1"><span class="big">🧰</span>还没有网址，点右上角「添加网址」放第一个吧</div>
+        <div class="wb-list">
+          <div class="wb-card" v-for="w in g.items" :key="w.id" @click="openIt(w)">
+            <span class="wb-ico" :style="{background:bgOf(w)}">{{icoOf(w)}}</span>
+            <div class="wb-main">
+              <div class="wb-name">{{w.name}}</div>
+              <div class="wb-url" :title="w.url">🔗 {{hostOf(w.url)}}</div>
+              <div class="wb-lines" v-if="w.account||w.password||w.note">
+                <div class="wb-line" v-if="w.account">
+                  <span class="wb-k">账号</span><span class="wb-v">{{w.account}}</span>
+                  <button class="wb-mini" @click.stop="copyText(w.account,'账号')" title="复制账号">⧉</button>
+                </div>
+                <div class="wb-line" v-if="w.password">
+                  <span class="wb-k">密码</span><span class="wb-v">{{shown[w.id] ? w.password : '••••••'}}</span>
+                  <button class="wb-mini" @click.stop="toggleShow(w.id)" :title="shown[w.id] ? '隐藏密码' : '显示密码'">{{shown[w.id] ? '🙈' : '👁'}}</button>
+                  <button class="wb-mini" @click.stop="copyText(w.password,'密码')" title="复制密码">⧉</button>
+                </div>
+                <div class="wb-line" v-if="w.note"><span class="wb-k">备注</span><span class="wb-v wb-note" :title="w.note">{{w.note}}</span></div>
+              </div>
+            </div>
+            <div class="wb-ops" @click.stop>
+              <span v-if="sortMode" class="wb-move">
+                <button @click.stop="move(w.id,-1,g.name)" :disabled="isFirst(w.id,g.name)" title="上移">▲</button>
+                <button @click.stop="move(w.id,1,g.name)" :disabled="isLast(w.id,g.name)" title="下移">▼</button>
+              </span>
+              <template v-else>
+                <button class="icon-btn" @click.stop="openEdit(w)" title="编辑">✏️</button>
+                <button class="icon-btn danger" @click.stop="del(w.id)" title="删除">🗑️</button>
+              </template>
+            </div>
+          </div>
+          <div v-if="!g.items.length" class="wb-col-empty">该分类还没有网址</div>
+        </div>
+      </section>
     </div>
 
     <modal :show="form.show" :title="form.title" @close="form.show=false">
-      <div class="field"><label>名称</label><input class="input" v-model="form.name" placeholder="如：公司邮箱 / 项目管理后台"></div>
-      <div class="field"><label>链接</label><input class="input" v-model="form.url" placeholder="如：mail.qq.com 或 https://xxx.com"></div>
       <div class="pl-grid">
+        <div class="field"><label>名称</label><input class="input" v-model="form.name" placeholder="如：公司邮箱 / 项目管理后台"></div>
         <div class="field"><label>分类</label><select class="select" v-model="form.cat"><option value="">未分类</option><option v-for="c in cats" :key="c.id" :value="c.name">{{c.name}}</option></select></div>
-        <div class="field"><label>图标（可选）</label><input class="input" v-model="form.emoji" placeholder="填个 emoji，如 📊"></div>
       </div>
-      <div class="hint" style="margin:-2px 0 10px">链接不用写 https://，会自动补全；不填图标则用名称首字生成彩色图标。</div>
+      <div class="field"><label>网址地址</label><input class="input" v-model="form.url" placeholder="如：mail.qq.com 或 https://xxx.com"></div>
+      <div class="pl-grid">
+        <div class="field"><label>账号（可选）</label><input class="input" v-model="form.account" placeholder="登录账号 / 用户名"></div>
+        <div class="field"><label>密码（可选）</label><input class="input" v-model="form.password" placeholder="登录密码"></div>
+      </div>
+      <div class="field"><label>备注（可选）</label><input class="input" v-model="form.note" placeholder="如：内网需先连 VPN / 管理员账号"></div>
+      <div class="field">
+        <label>图标与配色</label>
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+          <span class="wb-ico" :style="{background: form.color || bgOf({name:form.name,url:form.url})}">{{ form.emoji ? form.emoji.slice(0,2) : ((form.name||'?').trim().charAt(0)||'?').toUpperCase() }}</span>
+          <button class="btn gray" @click="pickOpen=!pickOpen">{{pickOpen?'收起图标库':'🎨 选择图标'}}</button>
+          <span style="display:flex;gap:5px;flex-wrap:wrap">
+            <button v-for="c in WB_COLORS" :key="c" class="wb-swatch" :class="{on:form.color===c}" :style="{background:c}" @click="form.color = (form.color===c ? '' : c)" title="选配色"></button>
+          </span>
+          <button class="btn gray" @click="clearIcon">恢复默认</button>
+        </div>
+        <div v-if="pickOpen" class="wb-picker">
+          <button v-for="e in WB_EMOJIS" :key="e" class="wb-pick" :class="{on:form.emoji===e}" @click="pickIcon(e)">{{e}}</button>
+        </div>
+      </div>
+      <div class="hint" style="margin:-2px 0 10px">链接不用写 https://，会自动补全；不填图标则用名称首字生成彩色图标。账号密码保存在本机浏览器里，重要密码不建议放在这里。</div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
 
