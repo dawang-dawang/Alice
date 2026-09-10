@@ -1003,8 +1003,8 @@ const Workbench = {
       const names = filter.value === "全部" ? cats.value.map((c) => c.name) : [filter.value];
       const out = names.map((n) => ({ name: n, items: all.filter((w) => (w.cat || "未分类") === n && match(w)) }));
       if (filter.value === "全部") {
-        const un = all.filter((w) => !(w.cat || "")) ;
-        if (un.length || !kwv) out.push({ name: "未分类", items: un.filter(match) });
+        const un = all.filter((w) => !(w.cat || ""));
+        if (un.length) out.push({ name: "未分类", items: un.filter(match) });
       }
       return out.filter((g) => g.items.length || !kwv);
     });
@@ -1032,6 +1032,68 @@ const Workbench = {
     }
     function del(id) { state.workbench = (state.workbench || []).filter((x) => x.id !== id); showToast("已删除"); }
     function openIt(w) { if (w && w.url) window.open(w.url, "_blank", "noopener"); }
+
+    /* 批量导入：粘贴一段文本自动识别 名称 / 网址 / 账号 / 密码 / 账套备注 / 分类 */
+    const imp = reactive({ show: false, text: "", rows: [], mode: "append" });
+    function openImport() { imp.show = true; imp.text = ""; imp.rows = []; imp.mode = "append"; }
+    function parseImport() {
+      const lines = String(imp.text || "").split(/\r?\n/);
+      let cat = "", gAcc = "", gPwd = "";
+      const rows = [];
+      lines.forEach((raw) => {
+        const ln = String(raw || "").trim();
+        if (!ln) return;
+        const gm = ln.match(/^【(.+?)】/);                       // 【xxx】→ 分类
+        if (gm) { cat = gm[1].replace(/演示地址\s*$/, "").trim(); return; }
+        const hasUrl = /https?:\/\//i.test(ln);
+        const accM = ln.match(/(?:用户名|账号|帐号|用户)\s*[：:]\s*(\S+)/);
+        const pwdM = ln.match(/密码\s*[：:]\s*(\S+)/);
+        if (!hasUrl) {                                            // 不带网址的行
+          const zm2 = ln.match(/账套\s*[：:]\s*([^\s，,；;]+)/);     // 单起一行的账套 → 归给上一条
+          if (zm2 && rows.length) { rows[rows.length - 1].note = "账套：" + zm2[1]; return; }
+          if (accM) gAcc = accM[1];                               // 否则当作整组通用账号密码
+          if (pwdM) gPwd = pwdM[1];
+          return;
+        }
+        const uM = ln.match(/https?:\/\/[^\s，,；;"'）)】]+/i);
+        if (!uM) return;
+        const url = uM[0];
+        let name = ln.slice(0, uM.index)
+          .replace(/^\s*\d+\s*[.、)）]?\s*/, "")
+          .replace(/[（(]?\s*(?:地址|网址|链接|链接地址|演示地址)\s*[）)]?\s*[：:]?\s*/g, "")
+          .replace(/[：:，,、\-\s]+$/g, "")
+          .trim();
+        if (!name) {
+          try { const u = new URL(url); const seg = u.pathname.replace(/\/+$/, "").split("/").filter(Boolean); name = seg.length ? seg[seg.length - 1] : u.hostname; }
+          catch (e) { name = url; }
+        }
+        const zm = ln.match(/账套\s*[：:]\s*([^\s，,；;]+)/);
+        rows.push({
+          name: name, url: url, cat: cat,
+          account: accM ? accM[1] : "", password: pwdM ? pwdM[1] : "",
+          note: zm ? "账套：" + zm[1] : "",
+        });
+      });
+      rows.forEach((r) => { if (!r.account && gAcc) r.account = gAcc; if (!r.password && gPwd) r.password = gPwd; });
+      imp.rows = rows;
+      if (!rows.length) showToast("没识别出网址，检查一下有没有 http");
+    }
+    function doImportRows() {
+      if (!imp.rows.length) return showToast("先点「识别」解析一下");
+      imp.rows.forEach((r) => { if (r.cat && !(state.workbenchCats || []).some((c) => c.name === r.cat)) state.workbenchCats.push({ id: uid(), name: r.cat }); });
+      if (imp.mode === "replace") state.workbench = [];
+      const exist = new Set((state.workbench || []).map((w) => String(w.url || "").replace(/\/+$/, "").toLowerCase()));
+      let n = 0;
+      imp.rows.forEach((r) => {
+        const key = r.url.replace(/\/+$/, "").toLowerCase();
+        if (exist.has(key)) return;
+        exist.add(key);
+        state.workbench.push({ id: uid(), name: r.name, url: r.url, cat: r.cat, emoji: "", color: "", account: r.account, password: r.password, note: r.note, createdAt: Date.now() });
+        n++;
+      });
+      imp.show = false;
+      showToast(n ? "已导入 " + n + " 个网址 ✓" : "这些网址都已经存在了");
+    }
 
     /* 位置调整：在所属栏内与相邻项交换（按看到的顺序生效） */
     function groupItems(name) {
@@ -1109,7 +1171,7 @@ const Workbench = {
     function clearIcon() { form.emoji = ""; form.color = ""; pickOpen.value = false; }
     function catOf(name) { return (state.workbenchCats || []).find((c) => c.name === name) || null; }
 
-    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
+    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, imp, openImport, parseImport, doImportRows, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
   },
   template: `
   <div>
@@ -1118,6 +1180,7 @@ const Workbench = {
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn gray" @click="sortMode=!sortMode">{{sortMode?'完成排序':'⇅ 调整位置'}}</button>
         <button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button>
+        <button class="btn gray" @click="openImport">📥 批量导入</button>
         <button class="btn" @click="openAdd">＋ 添加网址</button>
       </div>
     </div>
@@ -1215,6 +1278,31 @@ const Workbench = {
     <modal :show="catForm.show" :title="catForm.title" @close="catForm.show=false">
       <div class="field"><label>分类名称</label><input class="input" v-model="catForm.name" placeholder="如：常用工具 / 内部系统"></div>
       <div style="text-align:right"><button class="btn" @click="saveCat">保存</button></div>
+    </modal>
+
+    <modal :show="imp.show" :title="'批量导入网址'" @close="imp.show=false">
+      <div class="field">
+        <label>粘贴网址清单</label>
+        <textarea class="input" rows="7" v-model="imp.text" placeholder="把资料整段粘进来就行，例如：&#10;【V1\\V3\\A8最新版本演示地址】&#10;A8 ：http://demo.ttgrasp.com.cn/A8V10     账套：A8-10演示账套&#10;用户名：admin          密码：Tterp@8598"></textarea>
+      </div>
+      <div class="hint" style="margin:-4px 0 8px">自动识别：<b>带网址的行</b> = 一条记录（网址前面的字当名称）；<b>【xxx】</b> = 分类；<b>账套：xxx</b> = 备注；单独一行写的「用户名 / 密码」= 这一组通用账号密码。网址后可以跟 账号：xxx 密码：xxx。</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn gray" @click="parseImport">🔍 识别</button>
+        <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" value="append" v-model="imp.mode"> 追加（推荐，自动跳过已存在的）</label>
+        <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" value="replace" v-model="imp.mode"> 清空后导入</label>
+      </div>
+      <div v-if="imp.rows.length" class="wb-imp-list">
+        <div class="wb-imp-row" v-for="(r,i) in imp.rows" :key="i">
+          <b>{{r.name}}</b>
+          <span class="wb-imp-cat" v-if="r.cat">{{r.cat}}</span>
+          <span class="wb-imp-url">{{r.url}}</span>
+          <span class="wb-imp-tag" v-if="r.note">{{r.note}}</span>
+          <span class="wb-imp-tag" v-if="r.account">👤 {{r.account}}</span>
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:10px">
+        <button class="btn" :disabled="!imp.rows.length" @click="doImportRows">导入 {{imp.rows.length}} 条</button>
+      </div>
     </modal>
   </div>`,
 };
