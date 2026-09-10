@@ -495,6 +495,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .wb-pick.on { border-color: var(--accent); background: #fdeef3; }
 .wb-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .wb-swatch.on { border-color: var(--text-soft); box-shadow: 0 0 0 2px #fff inset; }
+/* 批量导入 */
+textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-family: inherit; padding-top: 9px; }
+.wb-imp-list { max-height: 210px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: #fffdf8; padding: 8px 10px; }
+.wb-imp-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.wb-imp-row:last-child { border-bottom: 0; }
+.wb-imp-cat { font-size: 11px; color: var(--green-deep); background: var(--green-soft); border-radius: 8px; padding: 1px 7px; }
+.wb-imp-url { color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.wb-imp-tag { font-size: 11px; color: var(--text-soft); background: #fdf4e8; border-radius: 8px; padding: 1px 7px; }
 @media (max-width: 640px) {
   .memo-card { height: 178px; }
   .mc-body { -webkit-line-clamp: 4; }
