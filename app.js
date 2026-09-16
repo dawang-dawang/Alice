@@ -3037,7 +3037,8 @@ const App = {
       { key: "brain", ico: "brain", name: "前额叶训练" },
     ];
     const compMap = { home: "dashboard", tasks: "tasks", memo: "memo", workbench: "workbench", plants: "plants", sport: "sport", finance: "finance", anniv: "anniv", baby: "baby", express: "express", brain: "brain" };
-    const badges = computed(() => ({ tasks: state.tasks.filter((t) => !t.done && (!t.due || t.due < todayStr()) ? false : !t.done).length, plants: state.plants.filter((p) => (p.lastWater ? dayDiff(addDays(p.lastWater, plantWaterDays(p)), todayStr()) : 0) <= 0 || (p.lastFertilize ? dayDiff(addDays(p.lastFertilize, p.fertilizeInterval || 30), todayStr()) : 0) <= 0).length }));
+    /* 菜单角标：日程只统计「当日待办 + 已逾期待办」，未到期的未来事项不计入 */
+    const badges = computed(() => ({ tasks: state.tasks.filter((t) => !t.done && t.due && t.due <= todayStr()).length, plants: state.plants.filter((p) => (p.lastWater ? dayDiff(addDays(p.lastWater, plantWaterDays(p)), todayStr()) : 0) <= 0 || (p.lastFertilize ? dayDiff(addDays(p.lastFertilize, p.fertilizeInterval || 30), todayStr()) : 0) <= 0).length }));
     const todayLabel = todayStr() + " 周" + "日一二三四五六"[new Date().getDay()];
     function goto(k) { current.value = k; menuOpen.value = false; }
     function toggleMenu() { menuOpen.value = !menuOpen.value; }
