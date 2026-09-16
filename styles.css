@@ -572,9 +572,7 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
 .cal-bar .btn.gray.sm { border-radius: 999px; background: #fffdf9; }
 .cal-bar .btn.gray.sm:hover { border-color: var(--green); color: var(--green-deep); background: var(--green-soft); }
 
-/* ③ 周头轻量化：去粉底色块，改灰粉小字（周六日单独着色） */
-.cal-cell.hdr { background: transparent; border: 0; box-shadow: none; color: var(--text-soft); font-size: 12px; font-weight: 600; letter-spacing: 1px; text-shadow: none; border-radius: 0; padding: 4px 0; }
-.cal-cell.hdr.wk { color: #e0809c; background: transparent; border: 0; }
+/* ③ 周头样式已按大王要求恢复为调整前的粉底样式（删除轻量化覆盖，原规则在上方生效） */
 
 /* ④ 格子加高 + 待办文字加大、加圆点前缀 */
 .cal-cell { height: 78px; border-radius: 14px; padding: 6px 7px; }
@@ -656,3 +654,22 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
 }
 
 
+
+/* =========================================================
+   v20260916dz 调整（大王 9-16 晚反馈）
+   ①隐藏日期后的值班圆点（值班信息保留：左边条 + 彩色待办文字）
+   ②心情 emoji 移到格子右上角
+   ③周头已恢复原样式（见上方 ③ 注释，删除了轻量化覆盖）
+   ④「中午班」改为「午班」是数据层迁移（app.js），无 CSS 改动
+   回滚：整块删除即可
+   ========================================================= */
+
+/* ① 日期后的值班圆点不显示 */
+.cal-duty-dot { display: none; }
+
+/* ② 心情 emoji 定位到格子右上角 */
+.cal-cell { position: relative; }
+.cal-mood { position: absolute; top: 4px; right: 6px; font-size: 12px; line-height: 1; }
+@media (max-width: 640px) {
+  .cal-mood { top: 2px; right: 4px; font-size: 11px; }
+}
