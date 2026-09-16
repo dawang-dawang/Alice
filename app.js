@@ -793,9 +793,22 @@ const Tasks = {
     function del(id) { state.tasks = state.tasks.filter((x) => x.id !== id); showToast("已删除"); }
     function clearDone() { const n = state.tasks.filter((t) => t.done).length; state.tasks = state.tasks.filter((x) => !x.done); showToast("已清空 " + n + " 条已完成"); }
 
-    /* ---------- 值班同步（数据源：排班系统，经 duty.json 中转） ---------- */
-    const dutySync = reactive({ show: false, loading: false, msg: "", text: "", rows: [] });
+    /* ---------- 值班（不外放数据：清单只在本地粘贴，不上传、不随站点发布） ---------- */
+    const dutySync = reactive({ show: false, msg: "", text: "", rows: [] });
     function pad2(n) { const s = String(n); return s.length < 2 ? "0" + s : s; }
+    /* 按班次名自动配色：粘贴时不用手写颜色，也能一眼区分不同班次 */
+    const DUTY_PALETTE = ["#dd6b20", "#3182ce", "#805ad5", "#2b6cb0", "#38a169", "#d53f8c", "#975a16", "#00838f"];
+    function autoDutyColor(name, start) {
+      const s = String(name || "") + " " + String(start || "");
+      if (/早|上午|晨|白班|日班/.test(s)) return "#dd6b20";                       // 橙
+      if (/中|午/.test(s)) return "#3182ce";                                     // 蓝
+      if (/夜|下夜/.test(s)) return "#2b6cb0";                                   // 深蓝
+      if (/晚|夕/.test(s)) return "#805ad5";                                     // 紫
+      if (/周末|休|全天/.test(s)) return "#38a169";                              // 绿
+      if (/备|机动|应|行政/.test(s)) return "#d53f8c";                           // 玫红
+      let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return DUTY_PALETTE[h % DUTY_PALETTE.length];
+    }
     function normDutyList(recs) {
       const t0 = todayStr();
       const out = [], seen = new Set();
@@ -810,7 +823,8 @@ const Tasks = {
         const id = date + "-" + sid;
         if (seen.has(id)) return;
         seen.add(id);
-        out.push({ id, date, shift: sid, shiftName: r.shiftName || r.name || "值班", start: r.start || "", end: r.end || "", color: r.color || "#805ad5", staff: r.staff || "" });
+        const nm = r.shiftName || r.name || "值班";
+        out.push({ id, date, shift: sid, shiftName: nm, start: r.start || "", end: r.end || "", color: r.color || autoDutyColor(nm, r.start), staff: r.staff || "" });
       });
       out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       return out;
@@ -823,37 +837,32 @@ const Tasks = {
     }
     function openDuty() {
       dutySync.show = true; dutySync.text = ""; dutySync.rows = [];
-      dutySync.msg = (state.duties || []).length ? "当前已有 " + state.duties.length + " 条值班记录（今天及以后）" : "还没有值班记录，点「从值班系统拉取」试试";
+      dutySync.msg = (state.duties || []).length ? "当前已有 " + state.duties.length + " 条值班记录（今天及以后）" : "把排班表里的值班清单粘贴到下面，点「识别」即可";
     }
-    async function pullDuties() {
-      dutySync.loading = true;
-      dutySync.msg = "正在拉取…";
-      try {
-        const r = await fetch("duty.json?t=" + Date.now(), { cache: "no-store" });
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const j = await r.json();
-        const n = applyDuties(Array.isArray(j) ? j : (j.records || []));
-        dutySync.msg = "✅ 已同步 " + n + " 条值班（今天及以后已写入日程）";
-        showToast("值班已同步 " + n + " 条 ✓");
-      } catch (e) {
-        dutySync.msg = "❌ 拉取失败：" + ((e && e.message) ? e.message : e) + " —— 可在下方手动粘贴值班清单";
-      }
-      dutySync.loading = false;
-    }
+    /* 粘贴识别：日期支持 2026-09-16 / 2026年9月16日 / 9月16日（无年份取今年） */
     function parseDutyText() {
+      const defY = today.slice(0, 4);
       const recs = [];
       String(dutySync.text || "").split(/\r?\n/).forEach((raw) => {
         const ln = String(raw || "").trim();
         if (!ln) return;
-        const dm = ln.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+        const dm = ln.match(/(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?/) || ln.match(/(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?/);
         if (!dm) return;
-        const tm = ln.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/);
+        const hasY = dm.length === 4;
+        const M = +(hasY ? dm[2] : dm[1]), D = +(hasY ? dm[3] : dm[2]);
+        if (!(M >= 1 && M <= 12 && D >= 1 && D <= 31)) return;
+        const date = (hasY ? dm[1] : defY) + "-" + pad2(M) + "-" + pad2(D);
+        const tm = ln.match(/(\d{1,2}:\d{2})\s*[-~—至到]\s*(\d{1,2}:\d{2})/);
         const cm = ln.match(/#([0-9a-fA-F]{3,8})/);
-        const name = ln.replace(dm[0], "").replace(tm ? tm[0] : "", "").replace(/#[0-9a-fA-F]{3,8}/g, "").replace(/[，,、:：\s]+/g, " ").trim() || "值班";
-        recs.push({ date: dm[1] + "-" + pad2(dm[2]) + "-" + pad2(dm[3]), shiftName: name, start: tm ? tm[1] : "", end: tm ? tm[2] : "", color: cm ? cm[1] : "", staff: "" });
+        const name = ln.replace(dm[0], "").replace(tm ? tm[0] : "", "").replace(/#[0-9a-fA-F]{3,8}/g, "")
+          .replace(/^[，,、:：\s\-—]+/, "").replace(/[，,、:：\s\-—]+$/, "").replace(/[，,、:：\s]+/g, " ").trim() || "值班";
+        recs.push({ date, shiftName: name, start: tm ? tm[1] : "", end: tm ? tm[2] : "", color: cm ? "#" + cm[1] : autoDutyColor(name, tm ? tm[1] : ""), staff: "" });
       });
       dutySync.rows = recs;
-      dutySync.msg = recs.length ? "识别到 " + recs.length + " 条，点「导入这些」写入日程" : "没识别到，格式如：2026-09-16 晚班A 17:30-19:30 #805ad5";
+      const past = recs.filter((r) => r.date < today).length;
+      dutySync.msg = recs.length
+        ? ("识别到 " + recs.length + " 条" + (past ? "（含 " + past + " 条过去的，导入时自动跳过）" : "") + "，点「导入这些」写入日程")
+        : "没识别到日期，格式如：2026-09-16 晚班A 17:30-19:30";
     }
     function importDutyText() {
       if (!dutySync.rows.length) return showToast("先点「识别」");
@@ -863,14 +872,14 @@ const Tasks = {
     }
     function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
 
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, pullDuties, parseDutyText, importDutyText, clearDuties };
+    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
   },
   template: `
   <div>
     <div class="module-head">
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn gray" @click="openDuty">🔁 同步值班{{dutyCount?('（'+dutyCount+'）'):''}}</button>
+        <button class="btn gray" @click="openDuty">📋 值班{{dutyCount?('（'+dutyCount+'）'):''}}</button>
         <button class="btn gray" @click="clearDone">清空已完成</button>
         <button class="btn" @click="openAdd">＋ 新事件</button>
       </div>
@@ -958,34 +967,35 @@ const Tasks = {
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
     </modal>
 
-    <modal :show="dutySync.show" :title="'同步值班'" @close="dutySync.show=false">
-      <div class="hint" style="margin:0 0 10px">值班数据来自排班系统，自动换算成日程里的待办，并在日历上用颜色标出值班日。历史日期不会写入。</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-        <button class="btn" :disabled="dutySync.loading" @click="pullDuties">{{dutySync.loading?'拉取中…':'🔁 从值班系统拉取'}}</button>
-        <button class="btn gray" @click="clearDuties">清空值班记录</button>
+    <modal :show="dutySync.show" :title="'值班'" @close="dutySync.show=false">
+      <div class="hint" style="margin:0 0 10px">值班清单<b>只在你自己浏览器里</b>，不上传、不随网站发布。把排班表里的值班信息整段复制粘贴到下面即可，写入后会在日历上按班次配色，并自动生成标注「🕒 值班」的待办。</div>
+      <div class="field" style="margin-bottom:8px">
+        <textarea class="input" rows="6" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026年9月18日 中午班 11:40-12:30&#10;9月19日 周末班 09:00-17:30&#10;&#10;（日期支持 2026-09-16 / 2026年9月16日 / 9月16日；时间可省略；行尾可加 #颜色 自定义配色）"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn" @click="parseDutyText">🔍 识别</button>
+        <button class="btn" v-if="dutySync.rows.length" @click="importDutyText">导入这些（{{dutySync.rows.length}}）</button>
+        <span class="hint" style="margin:0">不写颜色会按班次自动配色</span>
       </div>
       <div v-if="dutySync.msg" class="duty-msg">{{dutySync.msg}}</div>
 
-      <div class="duty-list" v-if="dutyCount">
+      <div class="duty-list" v-if="dutySync.rows.length">
+        <div class="duty-row" v-for="(r,i) in dutySync.rows" :key="'p'+i">
+          <i class="duty-bar" :style="{background:r.color}"></i>
+          <b>{{r.date}}</b>
+          <span class="wb-imp-cat">{{r.shiftName}}</span>
+          <span class="duty-time" v-if="r.start">{{r.start}}-{{r.end}}</span>
+        </div>
+      </div>
+      <div class="duty-list" v-else-if="dutyCount">
         <div class="duty-row" v-for="d in state.duties" :key="d.id">
           <i class="duty-bar" :style="{background:d.color}"></i>
           <b>{{d.date}}</b>
           <span class="wb-imp-cat">{{d.shiftName}}</span>
-          <span class="duty-time">{{d.start}}-{{d.end}}</span>
+          <span class="duty-time" v-if="d.start">{{d.start}}-{{d.end}}</span>
         </div>
       </div>
-
-      <details style="margin-top:12px">
-        <summary style="cursor:pointer;font-size:13px;color:var(--text-soft)">拉取不了？手动粘贴值班清单</summary>
-        <div class="field" style="margin-top:8px">
-          <textarea class="input" rows="5" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026-09-18 晚班B 19:30-22:00 #2b6cb0"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn gray" @click="parseDutyText">🔍 识别</button>
-          <button class="btn" v-if="dutySync.rows.length" @click="importDutyText">导入这些（{{dutySync.rows.length}}）</button>
-          <span class="hint" style="margin:0">行尾可加 #颜色</span>
-        </div>
-      </details>
+      <div style="text-align:right;margin-top:10px"><button class="btn gray" @click="clearDuties">清空值班记录</button></div>
     </modal>
   </div>`,
 };
