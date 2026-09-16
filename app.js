@@ -68,6 +68,7 @@ function holidayInfo(ds) {
     if (!name) name = fest;
     if (!name) return null;
     name = name.replace(/节$/, "").replace(/日$/, "");
+    if (name === "万圣节前夜") name = "万圣夜";
     return { name, rest };
   } catch (e) { return null; }
 }
