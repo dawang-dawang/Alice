@@ -1,16 +1,16 @@
-﻿/* 一瓶生活记录 · Service Worker（本地缓存，加速打开）
+﻿﻿/* 一瓶生活记录 · Service Worker（本地缓存，加速打开）
    策略：
    - index.html（入口）网络优先、失败回退缓存 → 永远拿到最新页面（新版本号资源随之更新）
    - 其余同源静态资源缓存优先、miss 时下载并缓存 → 日常打开秒开
    版本号：改 app.js/styles.css 等资源时，把 CACHE 名 bump 一次即可（旧缓存自动清理）
 */
-const CACHE = "lifewb-20260916dw";
+const CACHE = "lifewb-20260916dx";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./styles.css?v=20260916dw",
-  "./app.js?v=20260916dw",
-  "./foods_base.js?v=20260916dw",
+  "./styles.css?v=20260916dx",
+  "./app.js?v=20260916dx",
+  "./foods_base.js?v=20260916dx",
   "./vue.global.prod.js",
   "./lunar.js",
   "./plantlib.js",
