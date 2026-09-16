@@ -43,6 +43,34 @@ function getLunar(date) {
     };
   } catch (e) { return { text: "", term: "" }; }
 }
+/* 周末 / 节假日（日历用）
+   - 周末：直接按星期判断
+   - 法定节假日：lunar.js 内置国务院放假安排（含调休），有数据就用，返回 rest=true 放假 / rest=false 调休上班
+   - 没有放假安排的年份（如明年）：退化为只显示节日名（春节/国庆…），不标休/班
+   返回 null 表示这天既不是节日也不是休息日 */
+const FEST_SKIP = /国防教育日|爱牙日|非暴力日|纪念日|老年人日|消费者权益日|气象日|水日|环境日|禁毒日|献血日|艾滋病日|宪法日|消防日|学生日|记者日|护士节|医师节|警察节/;
+function holidayInfo(ds) {
+  try {
+    if (typeof Solar === "undefined") return null;
+    const y = +String(ds).slice(0, 4), m = +String(ds).slice(5, 7), d = +String(ds).slice(8, 10);
+    if (!(y && m && d)) return null;
+    let name = "", rest = null;
+    if (typeof HolidayUtil !== "undefined") {
+      const h = HolidayUtil.getHoliday(y, m, d);
+      if (h) { name = h.getName(); rest = !h.isWork(); }
+    }
+    let fest = "";
+    try {
+      const solar = Solar.fromYmd(y, m, d);
+      fest = (solar.getFestivals() || []).filter((x) => !FEST_SKIP.test(x))[0]
+        || (solar.getLunar().getFestivals() || []).filter((x) => !FEST_SKIP.test(x))[0] || "";
+    } catch (e) { fest = ""; }
+    if (!name) name = fest;
+    if (!name) return null;
+    name = name.replace(/节$/, "").replace(/日$/, "");
+    return { name, rest };
+  } catch (e) { return null; }
+}
 /* 农历 → 公历（纪念日按农历录入用），返回 "yyyy-mm-dd" */
 function lunarToSolar(y, m, d) {
   try {
@@ -735,7 +763,7 @@ const Tasks = {
     const sel = ref(today);
     const form = reactive({ show: false, title: "新事件", id: null, name: "", short: "", note: "", due: today, priority: "普通" });
     const showMood = ref(false);
-    const WK = ["日", "一", "二", "三", "四", "五", "六"];
+    const WK = ["一", "二", "三", "四", "五", "六", "日"];   // 周一开始
 
     /* 值班：日期 → 值班记录（用于日历着色与待办标注） */
     const dutyMap = computed(() => {
@@ -752,7 +780,8 @@ const Tasks = {
     const monthLabel = computed(() => view.y + "年" + (view.m + 1) + "月");
     const weeks = computed(() => {
       const first = new Date(view.y, view.m, 1);
-      const start = new Date(view.y, view.m, 1 - first.getDay());
+      const lead = (first.getDay() + 6) % 7;                  // 周一为一周第一天
+      const start = new Date(view.y, view.m, 1 - lead);
       const cells = [];
       for (let i = 0; i < 42; i++) {
         const dt = new Date(start); dt.setDate(start.getDate() + i);
@@ -761,7 +790,17 @@ const Tasks = {
         const hasUndone = todos.some((t) => !t.done);
         const allDone = todos.length > 0 && todos.every((t) => t.done);
         const dues = dutyMap.value[ds] || [];
-        cells.push({ ds, day: dt.getDate(), cur: dt.getMonth() === view.m, hasUndone, allDone, mood: state.moods[ds] || null, isToday: ds === today, tds: todos.slice(0, 2), more: todos.length > 2 ? todos.length - 2 : 0, dutyColor: dues.length ? (dues[0].color || "#805ad5") : "", dutyNames: dues.map((x) => x.shiftName || "值班").join("/") });
+        /* 周末 / 节假日标记：调休上班日不算周末 */
+        const info = holidayInfo(ds);
+        const wd = dt.getDay();
+        let wk = (wd === 0 || wd === 6);
+        let hkind = "", hname = "";
+        if (info) {
+          if (info.rest === false) { hkind = "work"; hname = "班"; wk = false; }
+          else if (info.rest === true) { hkind = "hol"; hname = info.name; }
+          else { hkind = "fest"; hname = info.name; }
+        }
+        cells.push({ ds, day: dt.getDate(), cur: dt.getMonth() === view.m, hasUndone, allDone, mood: state.moods[ds] || null, isToday: ds === today, tds: todos.slice(0, 2), more: todos.length > 2 ? todos.length - 2 : 0, dutyColor: dues.length ? (dues[0].color || "#805ad5") : "", dutyNames: dues.map((x) => x.shiftName || "值班").join("/"), wk, hkind, hname, wd });
       }
       const w = []; for (let i = 0; i < 6; i++) w.push(cells.slice(i * 7, i * 7 + 7));
       return w;
@@ -770,6 +809,17 @@ const Tasks = {
     const selTodos = computed(() => state.tasks.filter((t) => t.due === sel.value).sort((a, b) => a.done - b.done));
     const selMood = computed(() => state.moods[sel.value] || null);
     const selLunar = computed(() => getLunar(parseD(sel.value)));
+    /* 选中那天的周末/节假日：给当天面板显示 */
+    const selDay = computed(() => {
+      const info = holidayInfo(sel.value);
+      const wd = parseD(sel.value).getDay();
+      const wk = wd === 0 || wd === 6;
+      if (info && info.rest === false) return { kind: "work", txt: "调休上班" };
+      if (info && info.rest === true) return { kind: "hol", txt: info.name + " · 休假" };
+      if (info) return { kind: "fest", txt: info.name };
+      if (wk) return { kind: "wk", txt: wd === 6 ? "周六" : "周日" };
+      return null;
+    });
 
     function prevMonth() { if (view.m === 0) { view.m = 11; view.y--; } else view.m--; }
     function nextMonth() { if (view.m === 11) { view.m = 0; view.y++; } else view.m++; }
@@ -872,7 +922,7 @@ const Tasks = {
     }
     function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
 
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
+    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
   },
   template: `
   <div>
@@ -893,13 +943,14 @@ const Tasks = {
         <button class="btn gray sm" @click="goToday" style="margin-left:auto">今天</button>
       </div>
       <div class="cal-grid cal-wk">
-        <div class="cal-cell hdr" v-for="w in WK" :key="w">{{w}}</div>
+        <div class="cal-cell hdr" v-for="(w, i) in WK" :key="w" :class="{wk:(i===5||i===6)}">{{w}}</div>
       </div>
       <div class="cal-grid">
         <template v-for="(w, wi) in weeks" :key="wi">
-          <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel, 'has-duty':!!c.dutyColor}" :style="c.dutyColor?{'--duty':c.dutyColor}:null" @click="pick(c.ds)" :title="c.dutyNames?('值班：'+c.dutyNames):''">
+          <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel, 'has-duty':!!c.dutyColor, wk:c.wk, hol:c.hkind==='hol', workday:c.hkind==='work'}" :style="c.dutyColor?{'--duty':c.dutyColor}:null" @click="pick(c.ds)" :title="(c.dutyNames?('值班：'+c.dutyNames+'　'):'')+(c.hkind==='work'?'调休上班':(c.hname||''))">
             <div class="cal-top">
               <span class="cal-day" :class="{todo:c.hasUndone, alldone:c.allDone}">{{c.day}}</span>
+              <span v-if="c.hname" class="cal-fest" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}">{{c.hname}}</span>
               <span v-if="c.dutyColor" class="cal-duty-dot" :style="{background:c.dutyColor}"></span>
               <span v-if="c.mood" class="cal-mood" :title="'心情：' + ((MOODS.find(m=>m.k===c.mood)||{}).t || '')">{{(MOODS.find(m=>m.k===c.mood)||{}).e}}</span>
             </div>
@@ -914,6 +965,9 @@ const Tasks = {
         <span><i class="cal-dot red"></i>红圈有未完成待办</span>
         <span><i class="cal-dot gray"></i>灰圈待办已完成</span>
         <span><i class="cal-dot duty"></i>彩色点/左边条 = 当天有值班</span>
+        <span><i class="cal-dot wk"></i>周末</span>
+        <span><i class="cal-dot hol"></i>节假日休</span>
+        <span><i class="cal-dot workday"></i>调休上班</span>
         <span>😊 当日心情</span>
       </div>
     </div>
@@ -922,7 +976,10 @@ const Tasks = {
       <div class="dp-head">
         <div>
           <div class="dp-date">{{sel}} <span class="dp-lunar">农历 {{selLunar.text}}<template v-if="selLunar.term"> · {{selLunar.term}}</template></span></div>
-          <div class="dp-sub">{{selLunar.full}}</div>
+          <div class="dp-sub">
+            <span v-if="selDay" class="dp-badge" :class="selDay.kind">{{selDay.txt}}</span>
+            {{selLunar.full}}
+          </div>
         </div>
         <button class="btn gray sm" @click="showMood=!showMood">😊 心情{{selMood?('：'+(MOODS.find(m=>m.k===selMood)||{}).t):''}}</button>
       </div>
