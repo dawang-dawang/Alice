@@ -4,13 +4,13 @@
    - 其余同源静态资源缓存优先、miss 时下载并缓存 → 日常打开秒开
    版本号：改 app.js/styles.css 等资源时，把 CACHE 名 bump 一次即可（旧缓存自动清理）
 */
-const CACHE = "lifewb-20260916dr";
+const CACHE = "lifewb-20260916ds";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./styles.css?v=20260916dr",
-  "./app.js?v=20260916dr",
-  "./foods_base.js?v=20260916dr",
+  "./styles.css?v=20260916ds",
+  "./app.js?v=20260916ds",
+  "./foods_base.js?v=20260916ds",
   "./vue.global.prod.js",
   "./lunar.js",
   "./plantlib.js",
@@ -36,18 +36,6 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  // 数据文件（duty.json 等）：网络优先，保证每次拿到最新，离线时回退缓存
-  if (/\.json$/i.test(url.pathname)) {
-    e.respondWith(
-      fetch(req)
-        .then((r) => {
-          if (r && r.ok) { const cl = r.clone(); caches.open(CACHE).then((c) => c.put(req, cl)); }
-          return r;
-        })
-        .catch(() => caches.match(req).then((m) => m || new Response("{}", { headers: { "Content-Type": "application/json" } })))
-    );
-    return;
-  }
   const isHtml = !/\.[a-z0-9]+(\?|$)/i.test(url.pathname);
   if (isHtml) {
     // 页面：网络优先，离线时回退缓存
