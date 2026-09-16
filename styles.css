@@ -398,7 +398,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .cal-day { font-size: 12.5px; font-weight: 700; color: var(--text); line-height: 1.2; min-width: 19px; height: 19px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 .cal-day.todo { background: var(--danger); color: #fff; box-shadow: 0 1px 3px rgba(224, 138, 128, .4); }
 .cal-day.alldone { background: #cbbfa9; color: #fff; }
-.cal-mood { font-size: 13px; line-height: 1; }
+.cal-mood { font-size: 13px; line-height: 1; flex-shrink: 0; }
 .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .cal-dot.red { background: var(--danger); margin-left: auto; }
 .cal-dot.gray { background: #cbbfa9; margin-left: auto; }
@@ -419,7 +419,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .cal-cell.workday { background: #f2f7fd; border-color: #cfe0f2; }
 .cal-cell.other.wk, .cal-cell.other.hol, .cal-cell.other.workday { background: var(--panel-2); }
 .cal-cell.hdr.wk { color: #e07a99; }
-.cal-fest { font-size: 9px; line-height: 1.4; padding: 0 3px; border-radius: 5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; background: #ffe3ea; color: #d4628a; flex-shrink: 1; }
+.cal-fest { font-size: 9px; line-height: 1.4; padding: 0 3px; border-radius: 5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; min-width: 0; background: #ffe3ea; color: #d4628a; flex-shrink: 1; }
 .cal-fest.hol { background: #ffd9d9; color: #c53030; }
 .cal-fest.work { background: #dbeafe; color: #2b6cb0; }
 .cal-dot.wk { background: #ffc2d4; }
