@@ -12,7 +12,7 @@ const LS = {
 };
 
 /* 工作台全部数据键（本地 / 云端共用同一份结构） */
-const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats"];
+const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
 
 /* 纯本地使用：数据存浏览器 localStorage，无需登录账号 */
 
@@ -163,6 +163,7 @@ function svgLine(series, colors, xLabel, opt) {
 /* ---------- 全局状态 ---------- */
 const state = reactive({
   tasks: [],
+  duties: [],
   moods: {},
   memos: [],
   memoCats: [],
@@ -225,11 +226,19 @@ function syncPlanTasks() {
   const old = {};
   state.tasks.forEach((t) => { if (t.src) old[t.src + ":" + t.srcId] = t; });
   const out = state.tasks.filter((t) => !t.src);
-  const add = (key, src, srcId, title, note, due, short) => {
+  const add = (key, src, srcId, title, note, due, short, forceDone) => {
     const o = old[key];
-    out.push({ id: o ? o.id : uid(), title, short: short || (o && o.short) || "", note, due, priority: "普通", done: o ? !!o.done : false, src, srcId, createdAt: o ? o.createdAt : Date.now() });
+    out.push({ id: o ? o.id : uid(), title, short: short || (o && o.short) || "", note, due, priority: "普通", done: forceDone ? true : (o ? !!o.done : false), src, srcId, createdAt: o ? o.createdAt : Date.now() });
   };
   state.memos.forEach((m) => { if (m.syncTask && m.due) add("memo:" + m.id, "memo", m.id, "📝 " + (m.title || "记录"), m.content ? m.content.slice(0, 40) : "", m.due, m.title ? m.title.slice(0, 8) : "记录"); });
+  /* 值班：来自值班系统（duties），每条生成一个标注「值班」的待办 */
+  (state.duties || []).forEach((d) => {
+    if (!d || !d.date) return;
+    const t = (d.start || "") + (d.end ? "-" + d.end : "");
+    const who = d.staff ? " · " + d.staff : "";
+    const nm = d.shiftName || "值班";
+    add("duty:" + d.id, "duty", d.id, "🕒 " + nm + (t ? " " + t : ""), "值班" + (t ? " " + t : "") + who, d.date, nm, d.date < todayStr());
+  });
   state.anniv.forEach((a) => {
     if (!a.date) return;
     const due = annivTargetDate(a); // 与倒计时口径一致：农历不重复按所选农历年、公历不重复按固定日
@@ -354,7 +363,7 @@ async function authChangePw(newPassword) {
 function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
 function setLastSync(t) { if (authState.user) localStorage.setItem("lifeWB:lastSync:" + authState.user.id, t || ""); }
 /* 用户真正录入的数据 key（不含 sportActs/sportProfile/babyProfile 等内置或默认结构，避免误判"云端有数据"） */
-const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats"];
+const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
 function localHasData() {
   return USER_DATA_KEYS.some((k) => {
     const v = state[k];
@@ -728,6 +737,18 @@ const Tasks = {
     const showMood = ref(false);
     const WK = ["日", "一", "二", "三", "四", "五", "六"];
 
+    /* 值班：日期 → 值班记录（用于日历着色与待办标注） */
+    const dutyMap = computed(() => {
+      const m = {};
+      (state.duties || []).forEach((d) => { if (d && d.date) (m[d.date] = m[d.date] || []).push(d); });
+      return m;
+    });
+    const dutyColorOf = (t) => {
+      if (!t || t.src !== "duty") return "";
+      const d = (state.duties || []).find((x) => x.id === t.srcId);
+      return d ? (d.color || "#805ad5") : "#805ad5";
+    };
+
     const monthLabel = computed(() => view.y + "年" + (view.m + 1) + "月");
     const weeks = computed(() => {
       const first = new Date(view.y, view.m, 1);
@@ -739,11 +760,13 @@ const Tasks = {
         const todos = state.tasks.filter((t) => t.due === ds).sort((x, y) => (x.done - y.done));
         const hasUndone = todos.some((t) => !t.done);
         const allDone = todos.length > 0 && todos.every((t) => t.done);
-        cells.push({ ds, day: dt.getDate(), cur: dt.getMonth() === view.m, hasUndone, allDone, mood: state.moods[ds] || null, isToday: ds === today, tds: todos.slice(0, 2), more: todos.length > 2 ? todos.length - 2 : 0 });
+        const dues = dutyMap.value[ds] || [];
+        cells.push({ ds, day: dt.getDate(), cur: dt.getMonth() === view.m, hasUndone, allDone, mood: state.moods[ds] || null, isToday: ds === today, tds: todos.slice(0, 2), more: todos.length > 2 ? todos.length - 2 : 0, dutyColor: dues.length ? (dues[0].color || "#805ad5") : "", dutyNames: dues.map((x) => x.shiftName || "值班").join("/") });
       }
       const w = []; for (let i = 0; i < 6; i++) w.push(cells.slice(i * 7, i * 7 + 7));
       return w;
     });
+    const dutyCount = computed(() => (state.duties || []).length);
     const selTodos = computed(() => state.tasks.filter((t) => t.due === sel.value).sort((a, b) => a.done - b.done));
     const selMood = computed(() => state.moods[sel.value] || null);
     const selLunar = computed(() => getLunar(parseD(sel.value)));
@@ -769,13 +792,88 @@ const Tasks = {
     function toggle(t) { t.done = !t.done; }
     function del(id) { state.tasks = state.tasks.filter((x) => x.id !== id); showToast("已删除"); }
     function clearDone() { const n = state.tasks.filter((t) => t.done).length; state.tasks = state.tasks.filter((x) => !x.done); showToast("已清空 " + n + " 条已完成"); }
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone };
+
+    /* ---------- 值班同步（数据源：排班系统，经 duty.json 中转） ---------- */
+    const dutySync = reactive({ show: false, loading: false, msg: "", text: "", rows: [] });
+    function pad2(n) { const s = String(n); return s.length < 2 ? "0" + s : s; }
+    function normDutyList(recs) {
+      const t0 = todayStr();
+      const out = [], seen = new Set();
+      (recs || []).forEach((r) => {
+        if (!r) return;
+        let date = String(r.date || "").trim();
+        const dm = date.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+        if (dm) date = dm[1] + "-" + pad2(dm[2]) + "-" + pad2(dm[3]);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        if (date < t0) return;                                   // 只保留今天及以后，避免历史把日历塞满
+        const sid = String(r.shift || r.shiftId || r.shiftName || "duty");
+        const id = date + "-" + sid;
+        if (seen.has(id)) return;
+        seen.add(id);
+        out.push({ id, date, shift: sid, shiftName: r.shiftName || r.name || "值班", start: r.start || "", end: r.end || "", color: r.color || "#805ad5", staff: r.staff || "" });
+      });
+      out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      return out;
+    }
+    function applyDuties(recs) {
+      const list = normDutyList(recs);
+      state.duties = list;
+      syncPlanTasks();
+      return list.length;
+    }
+    function openDuty() {
+      dutySync.show = true; dutySync.text = ""; dutySync.rows = [];
+      dutySync.msg = (state.duties || []).length ? "当前已有 " + state.duties.length + " 条值班记录（今天及以后）" : "还没有值班记录，点「从值班系统拉取」试试";
+    }
+    async function pullDuties() {
+      dutySync.loading = true;
+      dutySync.msg = "正在拉取…";
+      try {
+        const r = await fetch("duty.json?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const j = await r.json();
+        const n = applyDuties(Array.isArray(j) ? j : (j.records || []));
+        dutySync.msg = "✅ 已同步 " + n + " 条值班（今天及以后已写入日程）";
+        showToast("值班已同步 " + n + " 条 ✓");
+      } catch (e) {
+        dutySync.msg = "❌ 拉取失败：" + ((e && e.message) ? e.message : e) + " —— 可在下方手动粘贴值班清单";
+      }
+      dutySync.loading = false;
+    }
+    function parseDutyText() {
+      const recs = [];
+      String(dutySync.text || "").split(/\r?\n/).forEach((raw) => {
+        const ln = String(raw || "").trim();
+        if (!ln) return;
+        const dm = ln.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+        if (!dm) return;
+        const tm = ln.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/);
+        const cm = ln.match(/#([0-9a-fA-F]{3,8})/);
+        const name = ln.replace(dm[0], "").replace(tm ? tm[0] : "", "").replace(/#[0-9a-fA-F]{3,8}/g, "").replace(/[，,、:：\s]+/g, " ").trim() || "值班";
+        recs.push({ date: dm[1] + "-" + pad2(dm[2]) + "-" + pad2(dm[3]), shiftName: name, start: tm ? tm[1] : "", end: tm ? tm[2] : "", color: cm ? cm[1] : "", staff: "" });
+      });
+      dutySync.rows = recs;
+      dutySync.msg = recs.length ? "识别到 " + recs.length + " 条，点「导入这些」写入日程" : "没识别到，格式如：2026-09-16 晚班A 17:30-19:30 #805ad5";
+    }
+    function importDutyText() {
+      if (!dutySync.rows.length) return showToast("先点「识别」");
+      const n = applyDuties(dutySync.rows);
+      dutySync.show = false;
+      showToast("已导入 " + n + " 条值班 ✓");
+    }
+    function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
+
+    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, pullDuties, parseDutyText, importDutyText, clearDuties };
   },
   template: `
   <div>
     <div class="module-head">
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('tasks')"></span>日程管理</div><div class="module-desc">日历 · 待办 · 心情，一天一记</div></div>
-      <div style="display:flex;gap:8px"><button class="btn gray" @click="clearDone">清空已完成</button><button class="btn" @click="openAdd">＋ 新事件</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn gray" @click="openDuty">🔁 同步值班{{dutyCount?('（'+dutyCount+'）'):''}}</button>
+        <button class="btn gray" @click="clearDone">清空已完成</button>
+        <button class="btn" @click="openAdd">＋ 新事件</button>
+      </div>
     </div>
 
     <div class="cal">
@@ -790,13 +888,14 @@ const Tasks = {
       </div>
       <div class="cal-grid">
         <template v-for="(w, wi) in weeks" :key="wi">
-          <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel}" @click="pick(c.ds)">
+          <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel, 'has-duty':!!c.dutyColor}" :style="c.dutyColor?{'--duty':c.dutyColor}:null" @click="pick(c.ds)" :title="c.dutyNames?('值班：'+c.dutyNames):''">
             <div class="cal-top">
               <span class="cal-day" :class="{todo:c.hasUndone, alldone:c.allDone}">{{c.day}}</span>
+              <span v-if="c.dutyColor" class="cal-duty-dot" :style="{background:c.dutyColor}"></span>
               <span v-if="c.mood" class="cal-mood" :title="'心情：' + ((MOODS.find(m=>m.k===c.mood)||{}).t || '')">{{(MOODS.find(m=>m.k===c.mood)||{}).e}}</span>
             </div>
             <div class="cal-list">
-              <div v-for="td in c.tds" :key="td.id" class="cal-td" :class="{done:td.done}">{{td.done?'✓ ':''}}{{td.short || td.title}}</div>
+              <div v-for="td in c.tds" :key="td.id" class="cal-td" :class="{done:td.done, duty:td.src==='duty'}" :style="td.src==='duty'?{color:dutyColorOf(td)}:null">{{td.done?'✓ ':''}}{{td.short || td.title}}</div>
               <div v-if="c.more" class="cal-td more">+{{c.more}} 项</div>
             </div>
           </div>
@@ -805,6 +904,7 @@ const Tasks = {
       <div class="cal-legend">
         <span><i class="cal-dot red"></i>红圈有未完成待办</span>
         <span><i class="cal-dot gray"></i>灰圈待办已完成</span>
+        <span><i class="cal-dot duty"></i>彩色点/左边条 = 当天有值班</span>
         <span>😊 当日心情</span>
       </div>
     </div>
@@ -831,7 +931,8 @@ const Tasks = {
           <div class="body">
             <div class="title" :class="{done:t.done}">{{t.title}}</div>
             <div class="meta">
-              <span class="tag" :class="statusOf(t).cls">{{statusOf(t).txt}}</span>
+              <span v-if="t.src==='duty'" class="tag" :style="{background:dutyColorOf(t),color:'#fff',borderColor:'transparent'}">🕒 值班</span>
+              <span v-else class="tag" :class="statusOf(t).cls">{{statusOf(t).txt}}</span>
               <span v-if="t.priority==='紧急'" class="tag red">紧急</span>
               <span v-if="t.due">📅 {{t.due}}</span>
               <span v-if="t.note">📌 {{t.note}}</span>
@@ -855,6 +956,36 @@ const Tasks = {
       </div>
       <div class="field"><label>备注</label><textarea class="textarea" v-model="form.note" placeholder="补充说明（可选）"></textarea></div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
+    </modal>
+
+    <modal :show="dutySync.show" :title="'同步值班'" @close="dutySync.show=false">
+      <div class="hint" style="margin:0 0 10px">值班数据来自排班系统，自动换算成日程里的待办，并在日历上用颜色标出值班日。历史日期不会写入。</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button class="btn" :disabled="dutySync.loading" @click="pullDuties">{{dutySync.loading?'拉取中…':'🔁 从值班系统拉取'}}</button>
+        <button class="btn gray" @click="clearDuties">清空值班记录</button>
+      </div>
+      <div v-if="dutySync.msg" class="duty-msg">{{dutySync.msg}}</div>
+
+      <div class="duty-list" v-if="dutyCount">
+        <div class="duty-row" v-for="d in state.duties" :key="d.id">
+          <i class="duty-bar" :style="{background:d.color}"></i>
+          <b>{{d.date}}</b>
+          <span class="wb-imp-cat">{{d.shiftName}}</span>
+          <span class="duty-time">{{d.start}}-{{d.end}}</span>
+        </div>
+      </div>
+
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--text-soft)">拉取不了？手动粘贴值班清单</summary>
+        <div class="field" style="margin-top:8px">
+          <textarea class="input" rows="5" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026-09-18 晚班B 19:30-22:00 #2b6cb0"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn gray" @click="parseDutyText">🔍 识别</button>
+          <button class="btn" v-if="dutySync.rows.length" @click="importDutyText">导入这些（{{dutySync.rows.length}}）</button>
+          <span class="hint" style="margin:0">行尾可加 #颜色</span>
+        </div>
+      </details>
     </modal>
   </div>`,
 };
