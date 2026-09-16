@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    个人日常生活工作台 · Vue3 纯前端 · 完全离线
    数据存浏览器 localStorage；Vue3 / 农历库均本地引入
    ========================================================= */
@@ -241,6 +241,13 @@ function loadAll() {
 }
 function saveAll() {
   KEYS.forEach((k) => LS.set(k, state[k])); // 始终写本地缓存
+}
+
+/* 数据修正（v20260916dz）：历史数据里的「中午班」统一改为「午班」 */
+function normalizeDutyNames() {
+  const rep = (s) => (typeof s === "string" ? s.split("中午班").join("午班") : s);
+  (state.duties || []).forEach((d) => { if (d) d.shiftName = rep(d.shiftName); });
+  (state.tasks || []).forEach((t) => { if (t) { t.title = rep(t.title); t.short = rep(t.short); } });
 }
 
 /* 老用户迁移：把缺失的内置运动项目补进 sportActs */
@@ -967,7 +974,7 @@ const Tasks = {
       <div class="cal-legend">
         <span><i class="cal-dot red"></i>红圈有未完成待办</span>
         <span><i class="cal-dot gray"></i>灰圈待办已完成</span>
-        <span><i class="cal-dot duty"></i>彩色点/左边条 = 当天有值班</span>
+        <span><i class="cal-dot duty"></i>彩色左边条 = 当天有值班</span>
         <span><i class="cal-dot hol"></i>节假日休</span>
         <span>😊 当日心情</span>
       </div>
@@ -1028,7 +1035,7 @@ const Tasks = {
     <modal :show="dutySync.show" :title="'值班'" @close="dutySync.show=false">
       <div class="hint" style="margin:0 0 10px">值班清单<b>只在你自己浏览器里</b>，不上传、不随网站发布。把排班表里的值班信息整段复制粘贴到下面即可，写入后会在日历上按班次配色，并自动生成标注「🕒 值班」的待办。</div>
       <div class="field" style="margin-bottom:8px">
-        <textarea class="input" rows="6" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026年9月18日 中午班 11:40-12:30&#10;9月19日 周末班 09:00-17:30&#10;&#10;（日期支持 2026-09-16 / 2026年9月16日 / 9月16日；时间可省略；行尾可加 #颜色 自定义配色）"></textarea>
+        <textarea class="input" rows="6" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026年9月18日 午班 11:40-12:30&#10;9月19日 周末班 09:00-17:30&#10;&#10;（日期支持 2026-09-16 / 2026年9月16日 / 9月16日；时间可省略；行尾可加 #颜色 自定义配色）"></textarea>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <button class="btn" @click="parseDutyText">🔍 识别</button>
@@ -3295,6 +3302,7 @@ const App = {
 loadAll();
 seedIfEmpty();
 ensureSportActs();
+normalizeDutyNames();
 syncPlanTasks();
 watch(state, saveAll, { deep: true });
 saveAll();
