@@ -925,7 +925,7 @@ const Tasks = {
     }
     function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
 
-    return { MOODS, WK, today, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
+    return { MOODS, WK, today, view, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
   },
   template: `
   <div>
@@ -941,7 +941,7 @@ const Tasks = {
     <div class="cal">
       <div class="cal-bar">
         <button class="icon-btn" @click="prevMonth" title="上一月">‹</button>
-        <div class="cal-ml">{{monthLabel}}</div>
+        <div class="cal-ml">{{view.m + 1}}月<span class="yr">{{view.y}}</span></div>
         <button class="icon-btn" @click="nextMonth" title="下一月">›</button>
         <button class="btn gray sm" @click="goToday" style="margin-left:auto">今天</button>
       </div>
@@ -968,9 +968,7 @@ const Tasks = {
         <span><i class="cal-dot red"></i>红圈有未完成待办</span>
         <span><i class="cal-dot gray"></i>灰圈待办已完成</span>
         <span><i class="cal-dot duty"></i>彩色点/左边条 = 当天有值班</span>
-        <span><i class="cal-dot wk"></i>周末</span>
         <span><i class="cal-dot hol"></i>节假日休</span>
-        <span><i class="cal-dot workday"></i>调休上班</span>
         <span>😊 当日心情</span>
       </div>
     </div>
