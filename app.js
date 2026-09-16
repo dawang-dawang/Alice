@@ -1034,8 +1034,8 @@ const Workbench = {
     function openIt(w) { if (w && w.url) window.open(w.url, "_blank", "noopener"); }
 
     /* 批量导入：粘贴一段文本自动识别 名称 / 网址 / 账号 / 密码 / 账套备注 / 分类 */
-    const imp = reactive({ show: false, text: "", rows: [], mode: "append" });
-    function openImport() { imp.show = true; imp.text = ""; imp.rows = []; imp.mode = "append"; }
+    const imp = reactive({ show: false, text: "", rows: [], mode: "append", defCat: "", bulkCat: "", editIdx: -1, newCat: "" });
+    function openImport() { imp.show = true; imp.text = ""; imp.rows = []; imp.mode = "append"; imp.defCat = (filter.value !== "全部" ? filter.value : ""); imp.bulkCat = ""; imp.editIdx = -1; }
     function parseImport() {
       const lines = String(imp.text || "").split(/\r?\n/);
       let cat = "", gAcc = "", gPwd = "";
@@ -1069,26 +1069,48 @@ const Workbench = {
         }
         const zm = ln.match(/账套\s*[：:]\s*([^\s，,；;]+)/);
         rows.push({
-          name: name, url: url, cat: cat,
+          name: name, url: url, cat: cat || (imp.defCat || ""), emoji: "", color: "",
           account: accM ? accM[1] : "", password: pwdM ? pwdM[1] : "",
           note: zm ? "账套：" + zm[1] : "",
         });
       });
-      rows.forEach((r) => { if (!r.account && gAcc) r.account = gAcc; if (!r.password && gPwd) r.password = gPwd; });
-      imp.rows = rows;
+      rows.forEach((r) => { if (!r.cat && imp.defCat) r.cat = imp.defCat; if (!r.account && gAcc) r.account = gAcc; if (!r.password && gPwd) r.password = gPwd; });
+      imp.rows = rows; imp.editIdx = -1;
       if (!rows.length) showToast("没识别出网址，检查一下有没有 http");
+    }
+    /* 识别结果逐条编辑 */
+    function delImpRow(i) { imp.rows.splice(i, 1); if (imp.editIdx === i) imp.editIdx = -1; }
+    function addImpRow() { imp.rows.push({ name: "", url: "", cat: imp.defCat || "", emoji: "", color: "", account: "", password: "", note: "" }); imp.editIdx = imp.rows.length - 1; }
+    function editImpRow(i) { imp.editIdx = (imp.editIdx === i ? -1 : i); }
+    function applyBulkCat(name) {
+      const nm = typeof name === "string" ? name : imp.bulkCat;
+      if (!nm) return showToast("先选一个分类");
+      imp.rows.forEach((r) => { r.cat = (nm === "（未分类）" ? "" : nm); });
+      imp.bulkCat = nm;
+      showToast(nm === "（未分类）" ? "已全部改为未分类" : "已全部改为「" + nm + "」");
+    }
+    function resolveCat(name) {                                              // 分类不存在则自动新建
+      const nm = String(name || "").trim();
+      if (!nm || !(state.workbenchCats || []).some((c) => c.name === nm)) {
+        if (nm) state.workbenchCats.push({ id: uid(), name: nm });
+      }
+      return nm;
     }
     function doImportRows() {
       if (!imp.rows.length) return showToast("先点「识别」解析一下");
-      imp.rows.forEach((r) => { if (r.cat && !(state.workbenchCats || []).some((c) => c.name === r.cat)) state.workbenchCats.push({ id: uid(), name: r.cat }); });
+      const bad = imp.rows.find((r) => !String(r.name || "").trim() || !String(r.url || "").trim());
+      if (bad) return showToast("有 " + imp.rows.filter((r) => !String(r.name || "").trim() || !String(r.url || "").trim()).length + " 条缺名称或网址，补一下再导入");
+      imp.rows.forEach((r) => { r.cat = resolveCat(r.cat); });
       if (imp.mode === "replace") state.workbench = [];
       const exist = new Set((state.workbench || []).map((w) => String(w.url || "").replace(/\/+$/, "").toLowerCase()));
       let n = 0;
       imp.rows.forEach((r) => {
-        const key = r.url.replace(/\/+$/, "").toLowerCase();
+        let url = String(r.url).trim();
+        if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+        const key = url.replace(/\/+$/, "").toLowerCase();
         if (exist.has(key)) return;
         exist.add(key);
-        state.workbench.push({ id: uid(), name: r.name, url: r.url, cat: r.cat, emoji: "", color: "", account: r.account, password: r.password, note: r.note, createdAt: Date.now() });
+        state.workbench.push({ id: uid(), name: String(r.name).trim(), url, cat: r.cat, emoji: String(r.emoji || "").trim(), color: r.color || "", account: String(r.account || "").trim(), password: r.password || "", note: String(r.note || "").trim(), createdAt: Date.now() });
         n++;
       });
       imp.show = false;
@@ -1170,8 +1192,13 @@ const Workbench = {
     function pickIcon(e) { form.emoji = e; pickOpen.value = false; }
     function clearIcon() { form.emoji = ""; form.color = ""; pickOpen.value = false; }
     function catOf(name) { return (state.workbenchCats || []).find((c) => c.name === name) || null; }
+    /* 导入行里给某一条单独选图标 */
+    const pickFor = ref(null);
+    function openPickFor(r) { pickFor.value = r; }
+    function pickForIcon(e) { if (pickFor.value) pickFor.value.emoji = e; pickFor.value = null; }
+    function pickForClear() { if (pickFor.value) pickFor.value.emoji = ""; pickFor.value = null; }
 
-    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, imp, openImport, parseImport, doImportRows, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
+    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, imp, pickFor, openImport, parseImport, doImportRows, delImpRow, addImpRow, editImpRow, applyBulkCat, openPickFor, pickForIcon, pickForClear, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
   },
   template: `
   <div>
@@ -1261,18 +1288,33 @@ const Workbench = {
         <label>图标与配色</label>
         <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
           <span class="wb-ico" :style="{background: form.color || bgOf({name:form.name,url:form.url})}">{{ form.emoji ? form.emoji.slice(0,2) : ((form.name||'?').trim().charAt(0)||'?').toUpperCase() }}</span>
+          <input class="input wb-emoji-in" v-model="form.emoji" maxlength="4" placeholder="✍️ 直接输入">
           <button class="btn gray" @click="pickOpen=!pickOpen">{{pickOpen?'收起图标库':'🎨 选择图标'}}</button>
-          <span style="display:flex;gap:5px;flex-wrap:wrap">
-            <button v-for="c in WB_COLORS" :key="c" class="wb-swatch" :class="{on:form.color===c}" :style="{background:c}" @click="form.color = (form.color===c ? '' : c)" title="选配色"></button>
-          </span>
           <button class="btn gray" @click="clearIcon">恢复默认</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <span class="hint" style="margin:0">配色</span>
+          <button v-for="c in WB_COLORS" :key="c" class="wb-swatch" :class="{on:form.color===c}" :style="{background:c}" @click="form.color = (form.color===c ? '' : c)" title="选配色"></button>
+          <label class="wb-swatch-in" :style="{background: form.color || bgOf({name:form.name,url:form.url})}" title="自定义颜色"><input type="color" v-model="form.color"></label>
         </div>
         <div v-if="pickOpen" class="wb-picker">
           <button v-for="e in WB_EMOJIS" :key="e" class="wb-pick" :class="{on:form.emoji===e}" @click="pickIcon(e)">{{e}}</button>
         </div>
       </div>
-      <div class="hint" style="margin:-2px 0 10px">链接不用写 https://，会自动补全；不填图标则用名称首字生成彩色图标。账号密码保存在本机浏览器里，重要密码不建议放在这里。</div>
+      <div class="hint" style="margin:-2px 0 10px">链接不用写 https://，会自动补全。图标可以直接输入任意 emoji 或一个汉字（如 📊 或 财），留空则用名称首字。账号密码保存在本机浏览器里，重要密码不建议放在这里。</div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
+    </modal>
+
+    <modal :show="!!pickFor" :title="'给「'+((pickFor&&pickFor.name)||'这一条')+'」选图标'" @close="pickFor=null">
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px">
+        <span class="wb-ico" :style="{background: pickFor && pickFor.emoji ? bgOf(pickFor) : '#7FA8D9'}">{{ pickFor && pickFor.emoji ? pickFor.emoji.slice(0,2) : ((pickFor && pickFor.name || '?').trim().charAt(0) || '?').toUpperCase() }}</span>
+        <input class="input wb-emoji-in" :value="pickFor ? pickFor.emoji : ''" @input="pickFor && (pickFor.emoji = $event.target.value)" maxlength="4" placeholder="✍️ 直接输入">
+        <button class="btn gray" @click="pickForClear">恢复默认</button>
+      </div>
+      <div class="wb-picker" style="max-height:230px">
+        <button v-for="e in WB_EMOJIS" :key="e" class="wb-pick" :class="{on: pickFor && pickFor.emoji===e}" @click="pickForIcon(e)">{{e}}</button>
+      </div>
+      <div style="text-align:right;margin-top:10px"><button class="btn" @click="pickFor=null">完成</button></div>
     </modal>
 
     <modal :show="catForm.show" :title="catForm.title" @close="catForm.show=false">
@@ -1286,21 +1328,65 @@ const Workbench = {
         <textarea class="input" rows="7" v-model="imp.text" placeholder="把资料整段粘进来就行，例如：&#10;【V1\\V3\\A8最新版本演示地址】&#10;A8 ：http://demo.ttgrasp.com.cn/A8V10     账套：A8-10演示账套&#10;用户名：admin          密码：Tterp@8598"></textarea>
       </div>
       <div class="hint" style="margin:-4px 0 8px">自动识别：<b>带网址的行</b> = 一条记录（网址前面的字当名称）；<b>【xxx】</b> = 分类；<b>账套：xxx</b> = 备注；单独一行写的「用户名 / 密码」= 这一组通用账号密码。网址后可以跟 账号：xxx 密码：xxx。</div>
+      <div class="pl-grid" style="margin-bottom:10px">
+        <div class="field">
+          <label>没写分类的，归到</label>
+          <select class="select" v-model="imp.defCat"><option value="">未分类</option><option v-for="c in cats" :key="c.id" :value="c.name">{{c.name}}</option></select>
+        </div>
+        <div class="field">
+          <label>一键改全部的分类</label>
+          <div style="display:flex;gap:6px">
+            <select class="select" style="flex:1" @change="applyBulkCat($event.target.value)"><option value="">选分类…</option><option value="（未分类）">未分类</option><option v-for="c in cats" :key="c.id" :value="c.name">{{c.name}}</option></select>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <button class="btn gray" @click="parseImport">🔍 识别</button>
+        <button class="btn gray" @click="addImpRow">＋ 手动加一行</button>
         <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" value="append" v-model="imp.mode"> 追加（推荐，自动跳过已存在的）</label>
         <label style="font-size:12.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" value="replace" v-model="imp.mode"> 清空后导入</label>
       </div>
       <div v-if="imp.rows.length" class="wb-imp-list">
-        <div class="wb-imp-row" v-for="(r,i) in imp.rows" :key="i">
-          <b>{{r.name}}</b>
-          <span class="wb-imp-cat" v-if="r.cat">{{r.cat}}</span>
-          <span class="wb-imp-url">{{r.url}}</span>
-          <span class="wb-imp-tag" v-if="r.note">{{r.note}}</span>
-          <span class="wb-imp-tag" v-if="r.account">👤 {{r.account}}</span>
+        <div class="wb-imp-row" v-for="(r,i) in imp.rows" :key="i" :class="{editing: imp.editIdx===i}">
+          <span class="wb-imp-seq">{{i+1}}</span>
+          <template v-if="imp.editIdx===i">
+            <div class="wb-imp-form">
+              <div class="pl-grid">
+                <div class="field"><label>名称</label><input class="input" v-model="r.name" placeholder="名称"></div>
+                <div class="field"><label>分类</label><input class="input" v-model="r.cat" list="wb-cat-list" placeholder="选已有或直接新建"></div>
+              </div>
+              <div class="field"><label>网址</label><input class="input" v-model="r.url" placeholder="xxx.com 或 https://xxx.com"></div>
+              <div class="pl-grid">
+                <div class="field"><label>账号</label><input class="input" v-model="r.account"></div>
+                <div class="field"><label>密码</label><input class="input" v-model="r.password"></div>
+              </div>
+              <div class="field"><label>备注</label><input class="input" v-model="r.note" placeholder="如：账套：xxx"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <button class="wb-mini" @click="openPickFor(r)" title="给这条选图标">🎨 图标</button>
+                <span v-if="r.emoji" class="wb-ico" style="width:24px;height:24px;font-size:12px;border-radius:7px" :style="{background:bgOf(r)}">{{r.emoji}}</span>
+                <span style="display:flex;gap:4px;flex-wrap:wrap">
+                  <button v-for="c in WB_COLORS" :key="c" class="wb-swatch" style="width:17px;height:17px" :class="{on:r.color===c}" :style="{background:c}" @click="r.color = (r.color===c ? '' : c)" title="选配色"></button>
+                </span>
+                <button class="wb-mini" @click="editImpRow(i)">收起</button>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <b>{{r.name}}</b>
+            <span class="wb-imp-cat">{{r.cat || '未分类'}}</span>
+            <span class="wb-imp-url">{{r.url}}</span>
+            <span class="wb-imp-tag" v-if="r.note">{{r.note}}</span>
+            <span class="wb-imp-tag" v-if="r.account">👤 {{r.account}}</span>
+            <span class="wb-imp-ops">
+              <button class="wb-mini" @click="editImpRow(i)" title="编辑这条">✏️</button>
+              <button class="wb-mini danger" @click="delImpRow(i)" title="移除这条">✕</button>
+            </span>
+          </template>
         </div>
       </div>
-      <div style="text-align:right;margin-top:10px">
+      <datalist id="wb-cat-list"><option v-for="c in cats" :key="c.id" :value="c.name"></option></datalist>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px">
+        <span class="hint" v-if="imp.rows.length" style="margin:0">共识别 {{imp.rows.length}} 条，点 ✏️ 可改，分类写新名字会自动新建</span>
         <button class="btn" :disabled="!imp.rows.length" @click="doImportRows">导入 {{imp.rows.length}} 条</button>
       </div>
     </modal>
