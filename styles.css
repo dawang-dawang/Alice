@@ -386,7 +386,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .cal-ml { font-size: 14px; font-weight: 700; color: var(--green-deep); }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-wk { margin-bottom: 4px; }
-.cal-cell { background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; height: 62px; min-height: 0; overflow: hidden; padding: 3px 4px; cursor: pointer; display: flex; flex-direction: column; gap: 1px; transition: .12s; }
+.cal-cell { position: relative; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; height: 62px; min-height: 0; overflow: hidden; padding: 3px 4px; cursor: pointer; display: flex; flex-direction: column; gap: 1px; transition: .12s; }
 .cal-cell.hdr { background: transparent; border: 0; height: auto; min-height: 0; overflow: visible; cursor: default; font-size: 11px; color: var(--text-mute); text-align: center; font-weight: 600; padding: 0 0 2px; }
 .cal-cell.cur { background: #fffdf9; }
 .cal-cell.other { opacity: .38; }
@@ -407,6 +407,18 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .cal-td.more { color: var(--accent); font-weight: 600; }
 .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 11.5px; color: var(--text-soft); align-items: center; }
 .cal-legend i.cal-dot { margin-right: 4px; vertical-align: middle; }
+.cal-dot.duty { background: linear-gradient(90deg, #ed8936 0 50%, #805ad5 50% 100%); }
+/* 值班：日历着色 */
+.cal-cell.has-duty::before { content: ''; position: absolute; left: 0; top: 3px; bottom: 3px; width: 3px; border-radius: 3px; background: var(--duty, #805ad5); }
+.cal-duty-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-left: 3px; box-shadow: 0 0 0 1.5px #fff; }
+.cal-td.duty { font-weight: 700; }
+/* 值班同步弹窗 */
+.duty-msg { font-size: 12.5px; color: var(--text-soft); background: #fffaf2; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+.duty-list { max-height: 210px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: #fffdf8; padding: 6px 10px; }
+.duty-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.duty-row:last-child { border-bottom: 0; }
+.duty-bar { width: 4px; height: 15px; border-radius: 3px; flex-shrink: 0; }
+.duty-time { color: var(--text-mute); font-size: 11.5px; }
 
 .day-panel { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
 .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
