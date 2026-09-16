@@ -609,16 +609,50 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
 /* ⑩ 图例与日历虚线分隔 */
 .cal-legend { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); gap: 6px 14px; }
 
-/* 手机端适配 */
+/* 手机端适配（dy 调整：收窄内边距、待办文字缩到 9px，一行能显示更多字） */
 @media (max-width: 640px) {
-  .cal { padding: 12px; }
-  .cal-cell { height: 64px; padding: 4px 5px; border-radius: 11px; }
+  .cal { padding: 10px 7px; }
+  .cal-cell { height: 66px; padding: 3px 4px; border-radius: 11px; }
   .cal-day { font-size: 12px; min-width: 20px; height: 20px; }
-  .cal-td { font-size: 10px; line-height: 1.4; padding-left: 8px; }
-  .cal-td::before { left: 1px; width: 4px; height: 4px; }
+  .cal-td { font-size: 9px; line-height: 1.45; padding-left: 5px; }
+  .cal-td::before { left: 0; width: 3px; height: 3px; }
   .cal-cell.hdr { font-size: 11.5px; letter-spacing: 0; }
   .cal-ml { font-size: 16px; }
   .cal-ml .yr { font-size: 12px; }
+}
+
+/* =========================================================
+   手机端整体兼容优化（v20260916dy）
+   ①模块头/按钮紧凑化（全模块） ②输入框 16px 防 iOS 聚焦放大
+   ③弹窗改底部抽屉式（贴拇指热区 + 安全区） ④工作台触摸目标加大
+   ⑤搜索框独占一行 ⑥排序按钮加大
+   ========================================================= */
+@media (max-width: 640px) {
+  /* ① 模块头紧凑化 */
+  .module-head { margin-bottom: 14px; gap: 10px; }
+  .module-title { font-size: 17px; gap: 7px; }
+  .mt-ico { width: 36px; height: 36px; }
+  .module-head .btn { padding: 6px 11px; font-size: 12px; border-radius: 12px; }
+
+  /* ② 输入框 ≥16px：iOS 聚焦时不再自动放大页面 */
+  input, select, textarea { font-size: 16px; }
+
+  /* ③ 弹窗 → 底部抽屉：宽度撑满、贴底、顶部圆角 + 底部安全区 */
+  .modal-mask { padding: 10px 10px 0; align-items: end; }
+  .modal { max-width: 100%; border-radius: 20px 20px 0 0; }
+  .modal-body { max-height: 78vh; padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); }
+
+  /* ④ 工作台：小按钮加大到可点的尺寸 */
+  .wb-mini { height: 24px; min-width: 24px; font-size: 11.5px; padding: 0 5px; }
+  .wb-ops .icon-btn { width: 32px; height: 32px; font-size: 14px; }
+  .wb-card { padding: 10px 11px; }
+  .wb-line { font-size: 12px; line-height: 1.6; }
+  .wb-move button { width: 26px; height: 20px; font-size: 11px; }
+
+  /* ⑤ 筛选行：搜索框独占一行，分类 chips 紧凑化自动换行 */
+  .search { flex-basis: 100%; max-width: 100%; min-width: 0; }
+  .toolbar { gap: 6px; }
+  .toolbar .chip { padding: 6px 12px; font-size: 12px; }
 }
 
 
