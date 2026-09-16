@@ -500,6 +500,8 @@ const Dashboard = {
     const tasksActive = computed(() => state.tasks.filter((t) => !t.done).length);
     const tasksToday = computed(() => state.tasks.filter((t) => !t.done && t.due === todayStr()).length);
     const tasksOverdue = computed(() => state.tasks.filter((t) => !t.done && t.due && t.due < todayStr()).length);
+    /* 与「日程管理」菜单角标同一口径：当日待办 + 已逾期待办 */
+    const tasksDueNow = computed(() => tasksToday.value + tasksOverdue.value);
 
     const plantsTotal = computed(() => state.plants.length);
     const plantsNeed = computed(() => state.plants.filter((p) => {
@@ -570,7 +572,7 @@ const Dashboard = {
 
     /* 快捷入口 · 6 个 */
     const quickActions = computed(() => ([
-      { key: "tasks", ico: "tasks", name: "日程", num: tasksActive.value ? tasksActive.value + " 待办" : "今日 " + tasksToday.value, badge: tasksOverdue.value || 0 },
+      { key: "tasks", ico: "tasks", name: "日程", num: tasksDueNow.value ? "待处理 " + tasksDueNow.value + " 项" : "暂无待办", badge: tasksOverdue.value || 0 },
       { key: "anniv", ico: "anniv", name: "纪念日", num: annivNear.value[0] ? (annivNear.value[0].days === 0 ? "今天" : annivNear.value[0].days + " 天后") : "暂无", badge: 0 },
       { key: "finance", ico: "finance", name: "记账", num: "今日 " + financeTodayCount.value + " 笔", badge: 0 },
       { key: "plants", ico: "plants", name: "植物", num: plantsTotal.value + " 株", badge: plantsNeed.value || 0 },
@@ -601,7 +603,7 @@ const Dashboard = {
       return any ? svgLine(out, outC, "月龄") : "";
     });
 
-    return { now, slogan, hintShow, lunar, week, dateText, dateTextShort, greeting, today, tasksActive, tasksToday, tasksOverdue, tasksRecent, plantsTotal, plantsNeed, plantsDueSoon, sportToday, sportRecent, finMonth, financeRecent, financeTodayCount, annivNear, annivSoon7, babyCount, todayHandle, todayHandleCount, quickActions, growthChart, iconSvg, iconFor, DOG_SVG };
+    return { now, slogan, hintShow, lunar, week, dateText, dateTextShort, greeting, today, tasksActive, tasksToday, tasksOverdue, tasksDueNow, tasksRecent, plantsTotal, plantsNeed, plantsDueSoon, sportToday, sportRecent, finMonth, financeRecent, financeTodayCount, annivNear, annivSoon7, babyCount, todayHandle, todayHandleCount, quickActions, growthChart, iconSvg, iconFor, DOG_SVG };
   },
   template: `
   <div>
