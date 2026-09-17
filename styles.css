@@ -797,3 +797,23 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
   .cal-cell { height: 72px; }
   .cal-list { margin-top: 1px; }
 }
+
+/* =========================================================
+   v20260917ef 短节日标记回到日期行（大王 9-17 反馈：班这类短字放格子顶部）
+   holidayShort 后 ≤2 字的（班/冬至/除夕等）内联在日期旁；>2 字的独占一行
+   ========================================================= */
+.cal-fest.inline {
+  display: inline-flex;
+  align-items: center;
+  position: static;
+  margin-top: 0;
+  font-size: 10px;
+  line-height: 1;
+  padding: 1.5px 4px;
+  align-self: center;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+@media (max-width: 640px) {
+  .cal-fest.inline { font-size: 9.5px; padding: 1.5px 3px; }
+}
