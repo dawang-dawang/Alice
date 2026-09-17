@@ -86,6 +86,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .am-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .am-count { font-size: 13px; color: var(--text-soft); margin-right: auto; }
 .am-count b { color: var(--green-deep); font-size: 15px; }
+.am-admin { font-size: 11.5px; color: #a8305c; background: #ffd9e6; border: 1px solid #ffb6c8; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .am-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; padding-right: 2px; }
 .am-row { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: #fffdf9; position: relative; }
 .am-row:hover { border-color: var(--green); }
