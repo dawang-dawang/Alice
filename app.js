@@ -310,6 +310,10 @@ function syncPlanTasks() {
 const AUTH_ENABLED = true; // ← 登录功能总开关
 const SUPA_URL = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) ? SUPABASE_URL : "";
 const SUPA_ANON = (typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : "";
+/* 管理员密钥（service_role）：用于「账号管理」里列出全部账号 / 改密 / 删号。
+   默认留空 → 账号管理弹窗里手动粘贴（只存 sessionStorage，不落盘、不进网站）。
+   若确实在本机长期使用，可在 index.html 里定义 SUPABASE_SERVICE_KEY 自动注入。 */
+const SERVICE_KEY = (typeof SUPABASE_SERVICE_KEY !== "undefined" && SUPABASE_SERVICE_KEY) ? SUPABASE_SERVICE_KEY : "";
 const authState = reactive({ user: null, token: "", refreshToken: "" });
 (function initAuth() {
   try { const a = JSON.parse(localStorage.getItem("lifeWB:auth") || "null"); if (a && a.token) { authState.user = a.user || null; authState.token = a.token; authState.refreshToken = a.refreshToken || ""; } } catch (e) {}
@@ -333,9 +337,10 @@ async function refreshToken() {
   })();
   return refreshing;
 }
-function supaHeaders(anon) {
+function supaHeaders(anon, extra) {
   const h = { "apikey": SUPA_ANON, "Content-Type": "application/json" };
   if (SUPA_ANON) h["Authorization"] = "Bearer " + (anon ? SUPA_ANON : authState.token);
+  if (extra) Object.keys(extra).forEach((k) => { h[k] = extra[k]; });
   return h;
 }
 /* 把 Supabase 英文错误翻译成中文友好提示 */
@@ -348,10 +353,11 @@ function humanAuthErr(msg) {
   if (/invalid\s*credentials|invalid\s*login/i.test(m)) return "账号或密码错误";
   if (/user.*already.*registered|already.*registered/i.test(m)) return "该账号已注册，直接登录即可";
   if (/email.*not.*confirmed/i.test(m)) return "请先在邮箱完成验证";
-  if (/password.*should.*be.*at.*least.*6/i.test(m)) return "密码至少 6 位";
+  if (/password.*should.*be.*at.*least.*6/i.test(m)) return "密码至少 8 位";
   return m;
 }
-async function supaFetch(path, method, body, anon, extra) {
+/* adminKey 有值 → 走管理员身份（账号管理用）；否则走普通用户/匿名 */
+async function supaFetch(path, method, body, anon, extra, adminKey) {
   if (!SUPA_URL || !SUPA_ANON) throw new Error("请先在 index.html 配置 Supabase 地址与 anon key");
   const headers = supaHeaders(anon);
   if (extra) Object.keys(extra).forEach((k) => { headers[k] = extra[k]; });
@@ -366,6 +372,18 @@ async function supaFetch(path, method, body, anon, extra) {
     const ec = String(obj.error_code || "");
     return /expired/i.test(ed) || /jwt\s*expired/i.test(msg) || /session_expired/i.test(ec) || (/expired/i.test(JSON.stringify(obj)) && (/jwt|token|grant/i.test(JSON.stringify(obj))));
   };
+  /* 管理员密钥请求：不走 anon，也不参与 JWT 刷新 */
+  if (adminKey) {
+    const ha = supaHeaders(false, { "Authorization": "Bearer " + adminKey });
+    const ra = await fetch(SUPA_URL + path, { method, headers: ha, body: body === undefined ? undefined : JSON.stringify(body) });
+    let ja = null;
+    try { ja = await ra.json(); } catch (e) {}
+    if (!ra.ok) {
+      const ma = (ja && (ja.message || ja.error_description || ja.msg)) || (ja && ja.error) || ("请求失败(" + ra.status + ")");
+      throw new Error(/invalid.*api.*key|jwt/i.test(String(ma)) ? "管理员密钥无效或已过期，请重新粘贴 service_role key" : humanAuthErr(String(ma)));
+    }
+    return ja;
+  }
   if (!res.ok && !anon && res.status === 401 && looksExpired(j)) {
     let refreshOk = true;
     try { await refreshToken(); } catch (e2) { refreshOk = false; }
@@ -391,26 +409,85 @@ async function supaFetch(path, method, body, anon, extra) {
   }
   return j;
 }
+/* 密码强度校验：至少 8 位，且必须同时含字母和数字，拒绝常见弱密码与连续/重复字符 */
+function pwIssue(pw) {
+  const p = String(pw || "");
+  if (p.length < 8) return "密码至少 8 位";
+  if (p.length > 72) return "密码太长（最多 72 位）";
+  if (/[\u4e00-\u9fa5]/.test(p)) return "密码不要用中文";
+  if (/\s/.test(p)) return "密码不要含空格";
+  if (!/[a-zA-Z]/.test(p)) return "密码要含字母";
+  if (!/\d/.test(p)) return "密码要含数字";
+  const low = p.toLowerCase();
+  const WEAK = ["12345678", "123456789", "1234567890", "password", "passw0rd", "qwerty", "qwerty123",
+    "abc12345", "abcd1234", "a1234567", "admin123", "iloveyou", "11111111", "88888888", "66666666",
+    "00000000", "asdfghjkl", "sunshine", "welcome1", "letmein1", "woaini1314", "5201314520"];
+  if (WEAK.includes(low)) return "这个密码太常见了，换一个";
+  if (/^(.)\1+$/.test(p)) return "密码不要全是一样的字符";
+  /* 连续字符：只拦「整串就是一条顺子」或很长的 6 位顺子，避免误伤 Abc12345 / 0123456a7 这类正常密码 */
+  if (/^(0123456789|9876543210|abcdefghij|jihgfedcba|qwertyuiop|poiuytrewq)/.test(low)) return "密码不要用连续字符（如 123456 / abcdef）";
+  if (/(0123456|1234567|2345678|3456789|4567890|abcdefg|bcdefgh|cdefghi|defghij)/.test(low)) return "密码不要用连续字符（如 123456 / abcdef）";
+  return "";
+}
+/* 生成一个强密码（12 位，大小写字母 + 数字 + 符号，保证各类都有） */
+function genStrongPw() {
+  const U = "ABCDEFGHJKLMNPQRSTUVWXYZ", L = "abcdefghijkmnpqrstuvwxyz", D = "23456789", S = "!@#$%^&*-_=+";
+  const all = U + L + D + S;
+  const pick = (s) => s[Math.floor(Math.random() * s.length)];
+  let out = pick(U) + pick(L) + pick(D) + pick(S);
+  for (let i = 0; i < 8; i++) out += pick(all);
+  return out.split("").sort(() => Math.random() - 0.5).join("");
+}
 /* 账号归一化：输入"账号或邮箱"，账号自动转成虚拟邮箱（编码@wb.local），Supabase 底层仍按邮箱认证 */
 function normAccount(acc) {
   const a = (acc || "").trim();
   if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) return a; // 已像邮箱：直接用
   return encodeURIComponent(a).replace(/%/g, "_").toLowerCase() + "@wb.local"; // 账号 → 编码虚拟邮箱（唯一、可复现）
 }
-/* 注册：账号/邮箱 + 密码（Confirm email 已关闭，注册即登录） */
+/* 注册：账号/邮箱 + 密码（Confirm email 已关闭，注册即登录）
+   注：user_metadata 里存 wb_account/wb_pw 是为了「账号管理」能直接看到账号与密码
+   —— 属明文的便利取舍，只有拿到 service_role key 才读得到 */
 async function authRegister(acc, password) {
-  const j = await supaFetch("/auth/v1/signup", "POST", { email: normAccount(acc), password }, true);
-  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth(); return authState.user;
+  const a = (acc || "").trim();
+  const j = await supaFetch("/auth/v1/signup", "POST", { email: normAccount(a), password, data: { wb_account: a, wb_pw: password } }, true);
+  authState.user = { id: j.user.id, username: a }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth(); return authState.user;
 }
 /* 登录：账号/邮箱 + 密码 */
 async function authLogin(acc, password) {
-  const j = await supaFetch("/auth/v1/token?grant_type=password", "POST", { email: normAccount(acc), password }, true);
-  authState.user = { id: j.user.id, username: (acc || "").trim() }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth(); return authState.user;
+  const a = (acc || "").trim();
+  const j = await supaFetch("/auth/v1/token?grant_type=password", "POST", { email: normAccount(a), password }, true);
+  authState.user = { id: j.user.id, username: a }; authState.token = j.access_token; authState.refreshToken = j.refresh_token || ""; persistAuth();
+  /* 顺手把账号名/密码补进 metadata，方便账号管理里查看（失败不影响登录） */
+  if (j.user && !(j.user.user_metadata && j.user.user_metadata.wb_pw)) {
+    supaFetch("/auth/v1/user", "PUT", { data: { wb_account: a, wb_pw: password } }).catch(() => {});
+  }
+  return authState.user;
 }
 function authLogout() { authState.user = null; authState.token = ""; authState.refreshToken = ""; persistAuth(); }
 /* 修改密码（需已登录；Supabase 返回 200 但邮箱会收到改密确认链接，用 manage 方式需要 service key） */
 async function authChangePw(newPassword) {
   return supaFetch("/auth/v1/user", "PUT", { password: newPassword });
+}
+/* 当前生效的管理员密钥：优先 index.html 注入的，其次账号管理里手动粘贴的 */
+function adminKeyNow() {
+  if (SERVICE_KEY) return SERVICE_KEY;
+  try { return sessionStorage.getItem("lifeWB:adminKey") || ""; } catch (e) { return ""; }
+}
+/* 列出全部账号（管理用，需 service_role key） */
+async function adminListUsers() {
+  return supaFetch("/auth/v1/admin/users?per_page=200", "GET", undefined, false, null, adminKeyNow());
+}
+/* 修改指定账号的密码（管理用，需 service_role key；同时把 user_metadata 里的明文密码一起更新） */
+async function adminSetPw(user, newPassword) {
+  return supaFetch("/auth/v1/admin/users/" + user.id, "PUT", {
+    password: newPassword,
+    user_metadata: Object.assign({}, user.user_metadata || {}, { wb_pw: newPassword }),
+  }, false, null, adminKeyNow());
+}
+/* 彻底删除账号（Auth 用户 + 其云端数据行） */
+async function adminDeleteUser(user) {
+  await supaFetch("/rest/v1/wb_data?uid=eq." + encodeURIComponent(user.id), "DELETE", undefined, false, null, adminKeyNow());
+  return supaFetch("/auth/v1/admin/users/" + user.id, "DELETE", undefined, false, null, adminKeyNow());
 }
 /* 上次成功同步时间戳（本地，按账号隔离），用于判断云端是否比本地新 */
 function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
@@ -637,7 +714,7 @@ const Dashboard = {
     </div>
     <div class="dash-hero">
       <div class="hero-left">
-        <div class="greet">{{greeting}} · 大王的小瓶</div>
+        <div class="greet">{{greeting}} · 大王</div>
         <div class="date"><span class="d-full">{{dateText}}</span><span class="d-short">{{dateTextShort}}</span> · 周{{week}}</div>
         <div class="sub">农历 {{lunar.text}}　{{lunar.term ? '· '+lunar.term : ''}}　{{lunar.full}}</div>
         <div class="slogan">“{{slogan}}”</div>
@@ -3120,7 +3197,13 @@ const App = {
       const acc = authForm.email.trim();
       if (!acc) return showToast("请输入账号或邮箱");
       if (acc.length < 2) return showToast("账号至少 2 个字符");
-      if (authForm.password.length < 6) return showToast("密码至少 6 位");
+      /* 注册：必须设强密码。登录：只校验非空（老账号可能是 6 位短密码） */
+      if (authForm.mode === "register") {
+        const bad = pwIssue(authForm.password);
+        if (bad) return showToast(bad + "（点「生成强密码」一键生成）");
+      } else if (!authForm.password) {
+        return showToast("请输入密码");
+      }
       authForm.busy = true;
       try {
         const u = authForm.mode === "register" ? await authRegister(acc, authForm.password) : await authLogin(acc, authForm.password);
@@ -3136,9 +3219,10 @@ const App = {
     }
     async function submitPw() {
       if (pwForm.busy) return;
-      if (pwForm.next.length < 6) return showToast("新密码至少 6 位");
+      const bad = pwIssue(pwForm.next);
+      if (bad) return showToast(bad);
       pwForm.busy = true;
-      try { await authChangePw(pwForm.next); pwForm.show = false; showToast("密码已修改（如邮箱有确认链接请点击完成）"); }
+      try { await authChangePw(pwForm.next); pwForm.show = false; pwForm.next = ""; showToast("密码已修改（如邮箱有确认链接请点击完成）"); }
       catch (e) { showToast(e.message); }
       pwForm.busy = false;
     }
@@ -3192,6 +3276,80 @@ const App = {
       document.addEventListener("visibilitychange", autoVisFn);
     }
     const accOpen = ref(false);
+    /* ---------- 账号管理（需 service_role key，仅本机 / 后台使用） ---------- */
+    const accMgr = reactive({ open: false, key: "", users: [], busy: false, loaded: false, editPw: null, newPw: "", reveal: {}, confirmDel: null });
+    function adminKeyGet() { try { return sessionStorage.getItem("lifeWB:adminKey") || ""; } catch (e) { return ""; } }
+    function openAccMgr() {
+      accMgr.open = true;
+      accMgr.key = SERVICE_KEY ? "" : adminKeyGet();
+      if (canAdmin()) loadUsers();
+    }
+    function canAdmin() { return !!(SERVICE_KEY || accMgr.key); }
+    async function loadUsers() {
+      if (!canAdmin()) { showToast("需要 service_role key 才能管理账号"); return; }
+      accMgr.busy = true;
+      try {
+        const j = await adminListUsers();
+        accMgr.users = (j && j.users) ? j.users : (Array.isArray(j) ? j : []);
+        accMgr.loaded = true;
+        showToast("共 " + accMgr.users.length + " 个账号");
+      } catch (e) { showToast(e.message); }
+      accMgr.busy = false;
+    }
+    function saveAdminKey() {
+      const k = accMgr.key.trim();
+      if (!k) return showToast("请粘贴 service_role key");
+      if (k.length < 100) return showToast("这不像 service_role key（太短）");
+      try { sessionStorage.setItem("lifeWB:adminKey", k); } catch (e) {}
+      loadUsers();
+    }
+    function clearAdminKey() {
+      accMgr.key = ""; accMgr.users = []; accMgr.loaded = false;
+      try { sessionStorage.removeItem("lifeWB:adminKey"); } catch (e) {}
+      showToast("已清除密钥");
+    }
+    function accName(u) {
+      const n = (u.user_metadata && u.user_metadata.wb_account) || "";
+      if (n) return n;
+      const em = String(u.email || "");
+      if (em.endsWith("@wb.local")) return decodeURIComponent(em.replace(/@wb\.local$/, "").replace(/_/g, "%"));
+      return em;
+    }
+    function accPw(u) {
+      const p = (u.user_metadata && u.user_metadata.wb_pw) || "";
+      return p || "（未记录）";
+    }
+    function toggleReveal(id) { accMgr.reveal[id] = !accMgr.reveal[id]; }
+    function openEditPw(u) { accMgr.editPw = u; accMgr.newPw = genStrongPw(); }
+    function useGenPw() { accMgr.newPw = genStrongPw(); }
+    async function saveEditPw() {
+      if (!accMgr.editPw) return;
+      const bad = pwIssue(accMgr.newPw);
+      if (bad) return showToast(bad);
+      if (accMgr.busy) return;
+      accMgr.busy = true;
+      try {
+        await adminSetPw(accMgr.editPw, accMgr.newPw);
+        showToast("密码已更新为：" + accMgr.newPw + "（请记好）");
+        accMgr.editPw = null; accMgr.newPw = "";
+        await loadUsers();
+      } catch (e) { showToast(e.message); }
+      accMgr.busy = false;
+    }
+    function askDel(u) { accMgr.confirmDel = u; }
+    async function doDelUser() {
+      const u = accMgr.confirmDel;
+      if (!u || accMgr.busy) return;
+      accMgr.busy = true;
+      try {
+        await adminDeleteUser(u);
+        accMgr.confirmDel = null;
+        showToast("已删除账号 " + accName(u) + "（含云端数据）");
+        if (authState.user && authState.user.id === u.id) { stopAutoSync(); authLogout(); }
+        await loadUsers();
+      } catch (e) { showToast(e.message); }
+      accMgr.busy = false;
+    }
 
     /* 页面加载时：如果有 refresh_token → 自动恢复 session + 同步数据 */
     onMounted(async () => {
@@ -3209,7 +3367,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
   },
   template: `
   <div class="app">
@@ -3267,6 +3425,10 @@ const App = {
               <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               导入备份
             </button>
+            <button class="btn-ghost" @click="openAccMgr">
+              <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19c0-3.2 3-5.5 6.5-5.5S15.5 15.8 15.5 19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18 8.5v6M21 11.5h-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              账号管理
+            </button>
           </div>
         </div>
         <button v-if="!AUTH_ENABLED" class="btn-ghost" @click="doExport">
@@ -3291,7 +3453,15 @@ const App = {
         <div class="modal-head"><span>{{authForm.mode==='register'?'注册账号':'账号登录'}}</span><button class="modal-close" @click="authForm.show=false">✕</button></div>
         <div class="modal-body">
           <div class="field"><label>账号 / 邮箱</label><input class="input" v-model="authForm.email" placeholder="输入账号或邮箱" @keyup.enter="submitAuth"></div>
-          <div class="field"><label>密码</label><input class="input" type="password" v-model="authForm.password" placeholder="至少 6 位" @keyup.enter="submitAuth"></div>
+          <div class="field">
+            <label>密码 <span v-if="authForm.mode==='register'" style="font-weight:400;color:var(--text-mute)">（至少 8 位，含字母和数字）</span></label>
+            <input class="input" type="password" v-model="authForm.password" :placeholder="authForm.mode==='register' ? '至少 8 位，含字母和数字' : '输入密码'" @keyup.enter="submitAuth">
+          </div>
+          <div v-if="authForm.mode==='register'" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <button class="btn gray sm" @click="authForm.password = genStrongPw()">🎲 生成强密码</button>
+            <span v-if="authForm.password && pwIssue(authForm.password)" style="font-size:11.5px;color:var(--danger)">⚠ {{pwIssue(authForm.password)}}</span>
+            <span v-else-if="authForm.password" style="font-size:11.5px;color:#2f855a">✓ 强度合格</span>
+          </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn gray" @click="authForm.mode = authForm.mode==='register' ? 'login' : 'register'">{{authForm.mode==='register'?'← 已有账号去登录':'注册新账号 →'}}</button>
             <button class="btn" @click="submitAuth" :disabled="authForm.busy">{{authForm.busy ? '处理中…' : (authForm.mode==='register' ? '注册' : '登录')}}</button>
@@ -3306,8 +3476,102 @@ const App = {
       <div class="modal">
         <div class="modal-head"><span>修改密码</span><button class="modal-close" @click="pwForm.show=false">✕</button></div>
         <div class="modal-body">
-          <div class="field"><label>新密码</label><input class="input" type="password" v-model="pwForm.next" placeholder="至少 6 位" @keyup.enter="submitPw"></div>
+          <div class="field"><label>新密码</label><input class="input" type="password" v-model="pwForm.next" placeholder="至少 8 位，含字母和数字" @keyup.enter="submitPw"></div>
+          <div class="acc-tip" v-if="pwIssue(pwForm.next)" style="color:var(--danger)">⚠ {{pwIssue(pwForm.next)}}</div>
           <div style="text-align:right"><button class="btn" @click="submitPw" :disabled="pwForm.busy">{{pwForm.busy ? '处理中…' : '确认修改'}}</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 账号管理（需 service_role key） -->
+    <div class="modal-mask" v-if="accMgr.open" @click.self="accMgr.open=false">
+      <div class="modal" style="max-width:760px;width:96%">
+        <div class="modal-head"><span>账号管理</span><button class="modal-close" @click="accMgr.open=false">✕</button></div>
+        <div class="modal-body">
+
+          <!-- 未配置 service_role key -->
+          <template v-if="!canAdmin()">
+            <div class="am-warn">
+              <b>⚠ 需要 service_role key</b>
+              <div>Supabase 默认不允许「列出所有账号」，因为要「看到所有账号和密码、并支持删除账号」，必须用管理员密钥。这个 key 权限很高，<b>只在这台电脑上粘贴、只保存在本次会话里</b>，不会被写进网站或上传。</div>
+              <div class="am-steps">
+                <div>1. 打开 <b>supabase.com</b> → 进入你的项目 → <b>Project Settings</b> → <b>API</b></div>
+                <div>2. 在 <b>Project API keys</b> 里找到 <b>service_role</b>，点眼睛图标显示后复制</div>
+                <div>3. 粘贴到下面，点「载入」</div>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">注：如果你把 service_role key 写进了本地文件，也可直接在 index.html 里配置，会自动识别。</div>
+            </div>
+            <div class="field"><label>service_role key</label><input class="input" type="password" v-model="accMgr.key" placeholder="粘贴 eyJ... 开头的一长串"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn" @click="saveAdminKey" :disabled="accMgr.busy">载入并查看账号</button>
+            </div>
+          </template>
+
+          <!-- 已配置：账号列表 -->
+          <template v-else>
+            <div class="am-bar">
+              <span class="am-count">共 <b>{{accMgr.users.length}}</b> 个账号</span>
+              <button class="btn gray sm" @click="loadUsers" :disabled="accMgr.busy">{{accMgr.busy ? '刷新中…' : '↻ 刷新'}}</button>
+              <button class="btn gray sm" @click="clearAdminKey">清除密钥</button>
+            </div>
+            <div v-if="accMgr.users.length" class="am-list">
+              <div class="am-row" v-for="u in accMgr.users" :key="u.id">
+                <div class="am-line1">
+                  <span class="am-name">{{accName(u)}}</span>
+                  <span class="am-tag" v-if="authState.user && authState.user.id===u.id">当前登录</span>
+                </div>
+                <div class="am-line2">
+                  <span class="am-lab">密码</span>
+                  <code class="am-pw">{{accMgr.reveal[u.id] ? accPw(u) : '••••••••'}}</code>
+                  <button class="am-mini" @click="toggleReveal(u.id)">{{accMgr.reveal[u.id] ? '隐藏' : '显示'}}</button>
+                  <button class="am-mini" @click="openEditPw(u)">改密</button>
+                </div>
+                <div class="am-line3">
+                  <span>ID {{(u.id||'').slice(0,8)}}…</span>
+                  <span>注册 {{(u.created_at||'').slice(0,10)}}</span>
+                  <span v-if="u.last_sign_in_at">最近登录 {{(u.last_sign_in_at||'').slice(0,10)}}</span>
+                </div>
+                <div class="am-ops">
+                  <button class="btn-ghost danger" @click="askDel(u)">删除账号</button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty sm"><span class="big">👤</span>还没有账号，或者点「↻ 刷新」重试</div>
+          </template>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 账号管理 · 修改某账号密码 -->
+    <div class="modal-mask" v-if="accMgr.editPw" @click.self="accMgr.editPw=null">
+      <div class="modal" style="max-width:440px">
+        <div class="modal-head"><span>修改密码 · {{accName(accMgr.editPw)}}</span><button class="modal-close" @click="accMgr.editPw=null">✕</button></div>
+        <div class="modal-body">
+          <div class="field"><label>新密码</label><input class="input" v-model="accMgr.newPw"></div>
+          <div class="acc-tip" v-if="pwIssue(accMgr.newPw)" style="color:var(--danger)">⚠ {{pwIssue(accMgr.newPw)}}</div>
+          <div class="acc-tip" v-else style="color:#2f855a">✓ 强度合格</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button class="btn gray" @click="useGenPw">🎲 生成强密码</button>
+            <button class="btn" @click="saveEditPw" :disabled="accMgr.busy || !!pwIssue(accMgr.newPw)">{{accMgr.busy ? '保存中…' : '保存'}}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 账号管理 · 删除确认 -->
+    <div class="modal-mask" v-if="accMgr.confirmDel" @click.self="accMgr.confirmDel=null">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-head"><span>⚠ 删除账号</span><button class="modal-close" @click="accMgr.confirmDel=null">✕</button></div>
+        <div class="modal-body">
+          <div class="am-warn danger">
+            即将<b>永久删除</b>账号 <b>{{accName(accMgr.confirmDel)}}</b>，同时删除它在云端的<b>全部数据</b>。
+            <div style="margin-top:4px">此操作<b>不可恢复</b>，删之前建议先登录该账号导出一次备份。</div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+            <button class="btn gray" @click="accMgr.confirmDel=null">取消</button>
+            <button class="btn danger" @click="doDelUser" :disabled="accMgr.busy">{{accMgr.busy ? '删除中…' : '确认删除'}}</button>
+          </div>
         </div>
       </div>
     </div>
