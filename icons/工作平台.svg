@@ -1,0 +1,21 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" rx="11" fill="#FFF0F5"/>
+  <!-- 显示器屏幕 -->
+  <rect x="7" y="9" width="30" height="21" rx="4" fill="#FFFFFF" stroke="#E07A99" stroke-width="2.2"/>
+  <!-- 标题栏 -->
+  <path d="M7 15.6 H37" stroke="#E07A99" stroke-width="2"/>
+  <circle cx="11.2" cy="12.4" r="1.1" fill="#F0A8B8"/>
+  <circle cx="15.2" cy="12.4" r="1.1" fill="#F0A8B8"/>
+  <!-- 面板（三个分类块） -->
+  <rect x="10.5" y="19" width="7" height="8" rx="2" fill="#FFD9E2"/>
+  <rect x="19" y="19" width="7" height="8" rx="2" fill="#DCE9F7"/>
+  <rect x="27.5" y="19" width="6.5" height="3.4" rx="1.7" fill="#FFE9D2"/>
+  <rect x="27.5" y="23.6" width="6.5" height="3.4" rx="1.7" fill="#E4F3E8"/>
+  <!-- 底座 -->
+  <path d="M20 30 H26 V34 H20 Z" fill="#F7B9CB"/>
+  <rect x="15" y="33.4" width="16" height="3" rx="1.5" fill="#E07A99"/>
+  <!-- 蝴蝶结（Kitty 标志） -->
+  <path d="M37.5 33.5 L42.6 30.4 V36.6 L37.5 33.5 Z" fill="#E07A99"/>
+  <path d="M37.5 33.5 L32.4 30.4 V36.6 L37.5 33.5 Z" fill="#F7B9CB"/>
+  <circle cx="37.5" cy="33.5" r="1.9" fill="#E07A99"/>
+</svg>
