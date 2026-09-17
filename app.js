@@ -311,9 +311,11 @@ const AUTH_ENABLED = true; // ← 登录功能总开关
 const SUPA_URL = (typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) ? SUPABASE_URL : "";
 const SUPA_ANON = (typeof SUPABASE_ANON_KEY !== "undefined" && SUPABASE_ANON_KEY) ? SUPABASE_ANON_KEY : "";
 /* 管理员密钥（service_role）：用于「账号管理」里列出全部账号 / 改密 / 删号。
-   默认留空 → 账号管理弹窗里手动粘贴（只存 sessionStorage，不落盘、不进网站）。
+   默认留空 → 账号管理弹窗里手动粘贴（存 localStorage，只在本机浏览器，不上传网站）。
    若确实在本机长期使用，可在 index.html 里定义 SUPABASE_SERVICE_KEY 自动注入。 */
 const SERVICE_KEY = (typeof SUPABASE_SERVICE_KEY !== "undefined" && SUPABASE_SERVICE_KEY) ? SUPABASE_SERVICE_KEY : "";
+/* 管理员账号白名单：只有这些账号登录后才看得到「账号管理」，才能改/删其他账号 */
+const ADMIN_ACCOUNTS = ["大王"];
 const authState = reactive({ user: null, token: "", refreshToken: "" });
 (function initAuth() {
   try { const a = JSON.parse(localStorage.getItem("lifeWB:auth") || "null"); if (a && a.token) { authState.user = a.user || null; authState.token = a.token; authState.refreshToken = a.refreshToken || ""; } } catch (e) {}
@@ -3278,14 +3280,23 @@ const App = {
     const accOpen = ref(false);
     /* ---------- 账号管理（需 service_role key，仅本机 / 后台使用） ---------- */
     const accMgr = reactive({ open: false, key: "", users: [], busy: false, loaded: false, editPw: null, newPw: "", reveal: {}, confirmDel: null });
-    function adminKeyGet() { try { return sessionStorage.getItem("lifeWB:adminKey") || ""; } catch (e) { return ""; } }
+    /* key 存 localStorage：贴一次长期有效，关掉浏览器也不丢；不会上传到网站 */
+    function adminKeyGet() { try { return localStorage.getItem("lifeWB:adminKey") || ""; } catch (e) { return ""; } }
+    /* 管理员 = 登录账号名是「大王」（可在 ADMIN_ACCOUNTS 里扩充） */
+    function isAdmin() {
+      if (!authState.user) return false;
+      return ADMIN_ACCOUNTS.indexOf(String(authState.user.username || "").trim()) >= 0;
+    }
     function openAccMgr() {
+      if (!isAdmin()) { showToast("只有管理员（大王）可以管理账号"); return; }
       accMgr.open = true;
       accMgr.key = SERVICE_KEY ? "" : adminKeyGet();
       if (canAdmin()) loadUsers();
     }
-    function canAdmin() { return !!(SERVICE_KEY || accMgr.key); }
+    function canAdmin() { return isAdmin() && hasKey(); }
+    function hasKey() { return !!(SERVICE_KEY || adminKeyGet() || accMgr.key); }
     async function loadUsers() {
+      if (!isAdmin()) { showToast("只有管理员（大王）可以查看账号列表"); return; }
       if (!canAdmin()) { showToast("需要 service_role key 才能管理账号"); return; }
       accMgr.busy = true;
       try {
@@ -3300,12 +3311,13 @@ const App = {
       const k = accMgr.key.trim();
       if (!k) return showToast("请粘贴 service_role key");
       if (k.length < 100) return showToast("这不像 service_role key（太短）");
-      try { sessionStorage.setItem("lifeWB:adminKey", k); } catch (e) {}
+      try { localStorage.setItem("lifeWB:adminKey", k); } catch (e) {}
+      showToast("密钥已记住，以后不用再粘了");
       loadUsers();
     }
     function clearAdminKey() {
       accMgr.key = ""; accMgr.users = []; accMgr.loaded = false;
-      try { sessionStorage.removeItem("lifeWB:adminKey"); } catch (e) {}
+      try { localStorage.removeItem("lifeWB:adminKey"); } catch (e) {}
       showToast("已清除密钥");
     }
     function accName(u) {
@@ -3324,6 +3336,7 @@ const App = {
     function useGenPw() { accMgr.newPw = genStrongPw(); }
     async function saveEditPw() {
       if (!accMgr.editPw) return;
+      if (!canAdmin()) return showToast("没有权限");
       const bad = pwIssue(accMgr.newPw);
       if (bad) return showToast(bad);
       if (accMgr.busy) return;
@@ -3340,6 +3353,7 @@ const App = {
     async function doDelUser() {
       const u = accMgr.confirmDel;
       if (!u || accMgr.busy) return;
+      if (!canAdmin()) { accMgr.confirmDel = null; return showToast("没有权限"); }
       accMgr.busy = true;
       try {
         await adminDeleteUser(u);
@@ -3367,7 +3381,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, hasKey, isAdmin, ADMIN_ACCOUNTS, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
   },
   template: `
   <div class="app">
@@ -3425,7 +3439,7 @@ const App = {
               <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 20V9M7 14l5-5 5 5M5 4h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               导入备份
             </button>
-            <button class="btn-ghost" @click="openAccMgr">
+            <button class="btn-ghost" v-if="isAdmin()" @click="openAccMgr">
               <svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 19c0-3.2 3-5.5 6.5-5.5S15.5 15.8 15.5 19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18 8.5v6M21 11.5h-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
               账号管理
             </button>
@@ -3491,18 +3505,18 @@ const App = {
 
           <!-- 未配置 service_role key -->
           <template v-if="!canAdmin()">
-            <div class="am-warn">
+            <div class="am-warn" v-if="!hasKey()">
               <b>⚠ 需要 service_role key</b>
-              <div>Supabase 默认不允许「列出所有账号」，因为要「看到所有账号和密码、并支持删除账号」，必须用管理员密钥。这个 key 权限很高，<b>只在这台电脑上粘贴、只保存在本次会话里</b>，不会被写进网站或上传。</div>
+              <div>Supabase 默认不允许「列出所有账号」，因为要「看到所有账号和密码、并支持删除账号」，必须用管理员密钥。这个 key 权限很高，<b>只存在这台电脑的浏览器里</b>，不会被写进网站或上传。</div>
               <div class="am-steps">
-                <div>1. 打开 <b>supabase.com</b> → 进入你的项目 → <b>Project Settings</b> → <b>API</b></div>
-                <div>2. 在 <b>Project API keys</b> 里找到 <b>service_role</b>，点眼睛图标显示后复制</div>
-                <div>3. 粘贴到下面，点「载入」</div>
+                <div>1. 打开 <b>supabase.com</b> → 进入你的项目 → <b>Project Settings</b> → <b>API Keys</b></div>
+                <div>2. 找到 <b>service_role</b>（新版叫 <b>secret</b>），点复制</div>
+                <div>3. 粘贴到下面，点「载入」—— <b>只需粘这一次，以后自动记住</b></div>
               </div>
-              <div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">注：如果你把 service_role key 写进了本地文件，也可直接在 index.html 里配置，会自动识别。</div>
             </div>
             <div class="field"><label>service_role key</label><input class="input" type="password" v-model="accMgr.key" placeholder="粘贴 eyJ... 开头的一长串"></div>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
+            <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+              <span style="font-size:11.5px;color:var(--text-mute)">🔒 只存本机，不上传、不写进网站</span>
               <button class="btn" @click="saveAdminKey" :disabled="accMgr.busy">载入并查看账号</button>
             </div>
           </template>
@@ -3511,8 +3525,9 @@ const App = {
           <template v-else>
             <div class="am-bar">
               <span class="am-count">共 <b>{{accMgr.users.length}}</b> 个账号</span>
+              <span class="am-admin">👑 管理员：{{authState.user ? authState.user.username : ''}}</span>
               <button class="btn gray sm" @click="loadUsers" :disabled="accMgr.busy">{{accMgr.busy ? '刷新中…' : '↻ 刷新'}}</button>
-              <button class="btn gray sm" @click="clearAdminKey">清除密钥</button>
+              <button class="btn gray sm" @click="clearAdminKey">忘记密钥</button>
             </div>
             <div v-if="accMgr.users.length" class="am-list">
               <div class="am-row" v-for="u in accMgr.users" :key="u.id">
@@ -3605,5 +3620,6 @@ app.component("anniv", Anniv);
 app.component("baby", Baby);
 app.component("express", Express);
 app.component("brain", Brain);
+
 
 app.mount("#app");
