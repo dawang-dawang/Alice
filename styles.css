@@ -754,3 +754,21 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
   .wb-main, .wb-lines, .wb-line, .wb-v { min-width: 0; }
   .wb-card { min-width: 0; overflow: hidden; }
 }
+
+/* =========================================================
+   v20260917ed 工作台卡片自适应（大王 9-17 反馈：内容无法显示完）
+   手机端长文字（名称/网址/账号/密码/备注）不再单行截断省略，
+   改为自动换行完整显示，卡片高度自适应内容
+   电脑端不受影响，整块删除即回滚
+   ========================================================= */
+@media (max-width: 640px) {
+  .wb-name { white-space: normal; word-break: break-word; }
+  .wb-url { white-space: normal; word-break: break-all; }
+  .wb-v { white-space: normal; word-break: break-all; }
+  .wb-line { flex-wrap: wrap; }
+  .wb-note { max-width: 100%; }
+  /* 换行后行高稍放宽，阅读舒适 */
+  .wb-name { line-height: 1.4; }
+  .wb-url { line-height: 1.5; }
+  .wb-line { line-height: 1.6; }
+}
