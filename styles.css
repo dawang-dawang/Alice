@@ -772,3 +772,28 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
   .wb-url { line-height: 1.5; }
   .wb-line { line-height: 1.6; }
 }
+
+/* =========================================================
+   v20260917ee 节日完整显示（大王 9-17 反馈：中秋只显示「中」）
+   节日标记移到日期下方独占一行，取消省略号截断（全端生效）
+   ========================================================= */
+.cal-fest {
+  display: block;
+  margin-top: 1px;
+  font-size: 9.5px;
+  line-height: 1.25;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;   /* 不再打省略号 */
+  letter-spacing: -.2px;
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  /* 手机端节日标记独立成行后，格子高度略增高以容纳 */
+  .cal-fest { font-size: 9px; padding: 0 3px; margin-top: 0; }
+  .cal-cell { height: 72px; }
+  .cal-list { margin-top: 1px; }
+}
