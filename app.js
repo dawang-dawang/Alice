@@ -2,7 +2,7 @@
    个人日常生活工作台 · Vue3 纯前端 · 完全离线
    数据存浏览器 localStorage；Vue3 / 农历库均本地引入
    ========================================================= */
-const { createApp, reactive, ref, computed, watch, onMounted, onUnmounted } = Vue;
+const { createApp, reactive, ref, computed, watch, onMounted, onUnmounted, nextTick } = Vue;
 
 /* ---------- 存储 ---------- */
 const PREFIX = "lifeWB:";
@@ -1292,6 +1292,61 @@ const Workbench = {
     const catForm = reactive({ show: false, title: "新增分类", id: null, name: "" });
 
     const cats = computed(() => state.workbenchCats || []);
+
+    /* ---------- 分类条横向滚动 ---------- */
+    const catBox = ref(null);
+    const catCanLeft = ref(false);
+    const catCanRight = ref(false);
+    function refreshCatArrows() {
+      const el = catBox.value;
+      if (!el) { catCanLeft.value = false; catCanRight.value = false; return; }
+      const max = el.scrollWidth - el.clientWidth;
+      catCanLeft.value = el.scrollLeft > 2;
+      catCanRight.value = max > 2 && el.scrollLeft < max - 2;
+    }
+    function onCatScroll() { refreshCatArrows(); }
+    /* 滚轮：竖向滚动转成横向（触控板/鼠标都顺手） */
+    function onCatWheel(e) {
+      const el = catBox.value;
+      if (!el) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 2) return;
+      const d = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+      el.scrollLeft += d;
+    }
+    /* 箭头：一次滑过约一屏的 70% */
+    function catScroll(dir) {
+      const el = catBox.value;
+      if (!el) return;
+      el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.7), behavior: "smooth" });
+    }
+    /* 切换筛选后把选中项滚进可视区 */
+    function scrollActiveCatIntoView() {
+      nextTick(() => {
+        const el = catBox.value;
+        if (!el) return;
+        const act = el.querySelector(".chip.active");
+        if (act && act.scrollIntoView) act.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        refreshCatArrows();
+      });
+    }
+    watch([cats, manage, () => filter.value], scrollActiveCatIntoView);
+    /* 生命周期钩子必须在 setup 同步阶段注册（不能放进 onMounted 回调里） */
+    let catRO = null;
+    onMounted(() => {
+      refreshCatArrows();
+      /* 容器尺寸变化（窗口缩放 / 侧栏折叠）时更新箭头 */
+      if (typeof ResizeObserver !== "undefined" && catBox.value) {
+        catRO = new ResizeObserver(() => refreshCatArrows());
+        catRO.observe(catBox.value);
+      }
+      window.addEventListener("resize", refreshCatArrows);
+    });
+    onUnmounted(() => {
+      if (catRO) { try { catRO.disconnect(); } catch (e) {} catRO = null; }
+      window.removeEventListener("resize", refreshCatArrows);
+    });
+
     const list = computed(() => {
       let r = state.workbench || [];
       if (filter.value !== "全部") r = r.filter((w) => (w.cat || "未分类") === filter.value);
@@ -1501,7 +1556,7 @@ const Workbench = {
     function pickForIcon(e) { if (pickFor.value) pickFor.value.emoji = e; pickFor.value = null; }
     function pickForClear() { if (pickFor.value) pickFor.value.emoji = ""; pickFor.value = null; }
 
-    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, imp, pickFor, openImport, parseImport, doImportRows, delImpRow, addImpRow, editImpRow, applyBulkCat, openPickFor, pickForIcon, pickForClear, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, state };
+    return { filter, kw, manage, sortMode, pickOpen, shown, form, catForm, imp, pickFor, openImport, parseImport, doImportRows, delImpRow, addImpRow, editImpRow, applyBulkCat, openPickFor, pickForIcon, pickForClear, cats, list, groups, groupColor, catOf, openAdd, openEdit, save, del, openIt, move, isFirst, isLast, openCatAdd, openCatEdit, saveCat, delCat, moveCat, icoOf, bgOf, hostOf, pickIcon, clearIcon, toggleShow, copyText, WB_COLORS, WB_EMOJIS, catBox, catCanLeft, catCanRight, onCatScroll, onCatWheel, catScroll, state };
   },
   template: `
   <div>
@@ -1516,14 +1571,27 @@ const Workbench = {
     </div>
     <div class="toolbar">
       <input class="input search" v-model="kw" placeholder="🔍 搜索名称或网址">
-      <button class="chip" :class="{active:filter==='全部'}" @click="filter='全部'">全部</button>
-      <button class="chip" v-for="c in cats" :key="c.id" :class="{active:filter===c.name}" @click="filter=c.name">{{c.name}}
-        <span v-if="manage" style="margin-left:4px" @click.stop="moveCat(c.id,-1)" title="前移">←</span>
-        <span v-if="manage" style="margin-left:3px" @click.stop="moveCat(c.id,1)" title="后移">→</span>
-        <span v-if="manage" style="margin-left:3px" @click.stop="openCatEdit(c)">✎</span>
-        <span v-if="manage" style="margin-left:2px;color:var(--danger)" @click.stop="delCat(c.id)">✕</span>
+    </div>
+    <!-- 分类条：分类多时可横向滑动查看（左右滑动 / 滚轮 / 拖拽滚动条） -->
+    <div class="cat-bar">
+      <button class="cat-arrow left" v-show="catCanLeft" @click="catScroll(-1)" title="向左" aria-label="向左滚动分类">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <button v-if="manage" class="chip" @click="openCatAdd">＋ 分类</button>
+      <div class="cat-scroll" ref="catBox" @scroll="onCatScroll" @wheel.prevent="onCatWheel">
+        <div class="cat-track">
+          <button class="chip" :class="{active:filter==='全部'}" @click="filter='全部'">全部</button>
+          <button class="chip" v-for="c in cats" :key="c.id" :class="{active:filter===c.name}" @click="filter=c.name">{{c.name}}
+            <span v-if="manage" style="margin-left:4px" @click.stop="moveCat(c.id,-1)" title="前移">←</span>
+            <span v-if="manage" style="margin-left:3px" @click.stop="moveCat(c.id,1)" title="后移">→</span>
+            <span v-if="manage" style="margin-left:3px" @click.stop="openCatEdit(c)">✎</span>
+            <span v-if="manage" style="margin-left:2px;color:var(--danger)" @click.stop="delCat(c.id)">✕</span>
+          </button>
+          <button v-if="manage" class="chip" @click="openCatAdd">＋ 分类</button>
+        </div>
+      </div>
+      <button class="cat-arrow right" v-show="catCanRight" @click="catScroll(1)" title="向右" aria-label="向右滚动分类">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
     <div v-if="sortMode" style="font-size:12px;color:var(--text-mute);margin:-4px 0 10px">排序模式：用 ▲▼ 在所属分类栏内调整位置，点卡片仍可打开网站。</div>
     <div v-if="!state.workbench.length" class="empty" style="padding:26px 0"><span class="big">🧰</span>还没有网址，点右上角「添加网址」放第一个吧</div>
