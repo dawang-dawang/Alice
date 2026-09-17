@@ -712,3 +712,45 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
   /* 添加/编辑弹窗表单：名称与分类、账号与密码改单列，输入框全宽好填写 */
   .pl-grid { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* =========================================================
+   v20260917eb 手机端工作台二次优化（大王 9-17 反馈：显示不全 + 分类缩小）
+   ①iOS 防自动放大兜底：!important 强制全部输入框 ≥16px
+     （之前 .pl-grid .input 13px 优先级压过全局规则，点弹窗输入框
+      会触发 iOS 页面缩放且不还原，导致工作台显示不全）
+   ②分类栏/卡片整体再缩一档：高度更紧凑，一屏能看到更多条目
+   电脑端不受影响（全部在 640px 媒体查询内），整块删除即回滚
+   ========================================================= */
+@media (max-width: 640px) {
+  /* ① 防缩放兜底：覆盖 .pl-grid .input / .wb-emoji-in / .wb-imp-form .input 等小字号 */
+  input, select, textarea, .input, .select { font-size: 16px !important; }
+
+  /* ② 分类栏容器再收紧 */
+  .wb-col { padding: 8px 9px 9px; border-radius: 12px; }
+  .wb-col-head { gap: 5px; padding-bottom: 6px; margin-bottom: 6px; }
+  .wb-col-name { font-size: 13.5px; }
+  .wb-col-num { font-size: 10.5px; padding: 1px 6px; }
+  .wb-list { gap: 6px; }
+  .wb-col-empty { font-size: 12px; padding: 10px 0; }
+
+  /* ② 卡片整体缩一档 */
+  .wb-card { gap: 8px; padding: 9px 10px; border-radius: 12px; }
+  .wb-ico { width: 30px; height: 30px; border-radius: 9px; font-size: 14px; }
+  .wb-name { font-size: 14px; }
+  .wb-url { font-size: 11px; margin-top: 0; }
+  .wb-lines { gap: 1px; margin-top: 2px; }
+  .wb-line { font-size: 11.5px; gap: 5px; }
+
+  /* ② 操作按钮相应缩小，右缘不再拥挤 */
+  .wb-ops { gap: 2px; }
+  .wb-ops .icon-btn { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+  .wb-mini { height: 24px; min-width: 24px; font-size: 11px; border-radius: 7px; }
+
+  /* ② 筛选行收紧 */
+  .toolbar { gap: 5px; margin-bottom: 10px; }
+  .toolbar .chip { padding: 5px 11px; font-size: 12px; }
+
+  /* 防横向溢出保险：长内容只截断不撑破 */
+  .wb-main, .wb-lines, .wb-line, .wb-v { min-width: 0; }
+  .wb-card { min-width: 0; overflow: hidden; }
+}
