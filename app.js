@@ -3192,8 +3192,11 @@ const App = {
     /* ---------- 账号登录 / 同步 ---------- */
     const authForm = reactive({ show: false, mode: "login", email: "", password: "", busy: false });
     const pwForm = reactive({ show: false, next: "", busy: false });
-    function openLogin() { Object.assign(authForm, { show: true, mode: "login", email: "", password: "", busy: false }); }
-    function openRegister() { Object.assign(authForm, { show: true, mode: "register", email: "", password: "", busy: false }); }
+    /* 密码显隐开关（各处独立）：key 为标识，true = 明文显示 */
+    const pwShow = reactive({ auth: false, change: false, adminEdit: false, adminKey: false });
+    function togglePw(k) { pwShow[k] = !pwShow[k]; }
+    function openLogin() { Object.assign(authForm, { show: true, mode: "login", email: "", password: "", busy: false }); pwShow.auth = false; }
+    function openRegister() { Object.assign(authForm, { show: true, mode: "register", email: "", password: "", busy: false }); pwShow.auth = false; }
     async function submitAuth() {
       if (authForm.busy) return;
       const acc = authForm.email.trim();
@@ -3381,7 +3384,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, hasKey, isAdmin, ADMIN_ACCOUNTS, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, pwShow, togglePw, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, hasKey, isAdmin, ADMIN_ACCOUNTS, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
   },
   template: `
   <div class="app">
@@ -3469,7 +3472,16 @@ const App = {
           <div class="field"><label>账号 / 邮箱</label><input class="input" v-model="authForm.email" placeholder="输入账号或邮箱" @keyup.enter="submitAuth"></div>
           <div class="field">
             <label>密码 <span v-if="authForm.mode==='register'" style="font-weight:400;color:var(--text-mute)">（至少 8 位，含字母和数字）</span></label>
-            <input class="input" type="password" v-model="authForm.password" :placeholder="authForm.mode==='register' ? '至少 8 位，含字母和数字' : '输入密码'" @keyup.enter="submitAuth">
+            <div class="pw-wrap">
+              <input class="input" :type="pwShow.auth ? 'text' : 'password'" v-model="authForm.password" :placeholder="authForm.mode==='register' ? '至少 8 位，含字母和数字' : '输入密码'" @keyup.enter="submitAuth">
+              <button type="button" class="pw-eye" :class="{on: pwShow.auth}" @click="togglePw('auth')" :title="pwShow.auth ? '隐藏密码' : '显示密码'" :aria-label="pwShow.auth ? '隐藏密码' : '显示密码'">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="2.9" stroke="currentColor" stroke-width="1.7"/>
+                  <path v-if="pwShow.auth" d="M4 20L20 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <div v-if="authForm.mode==='register'" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
             <button class="btn gray sm" @click="authForm.password = genStrongPw()">🎲 生成强密码</button>
@@ -3490,7 +3502,18 @@ const App = {
       <div class="modal">
         <div class="modal-head"><span>修改密码</span><button class="modal-close" @click="pwForm.show=false">✕</button></div>
         <div class="modal-body">
-          <div class="field"><label>新密码</label><input class="input" type="password" v-model="pwForm.next" placeholder="至少 8 位，含字母和数字" @keyup.enter="submitPw"></div>
+          <div class="field"><label>新密码</label>
+            <div class="pw-wrap">
+              <input class="input" :type="pwShow.change ? 'text' : 'password'" v-model="pwForm.next" placeholder="至少 8 位，含字母和数字" @keyup.enter="submitPw">
+              <button type="button" class="pw-eye" :class="{on: pwShow.change}" @click="togglePw('change')" :title="pwShow.change ? '隐藏密码' : '显示密码'" :aria-label="pwShow.change ? '隐藏密码' : '显示密码'">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="2.9" stroke="currentColor" stroke-width="1.7"/>
+                  <path v-if="pwShow.change" d="M4 20L20 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
           <div class="acc-tip" v-if="pwIssue(pwForm.next)" style="color:var(--danger)">⚠ {{pwIssue(pwForm.next)}}</div>
           <div style="text-align:right"><button class="btn" @click="submitPw" :disabled="pwForm.busy">{{pwForm.busy ? '处理中…' : '确认修改'}}</button></div>
         </div>
@@ -3514,7 +3537,18 @@ const App = {
                 <div>3. 粘贴到下面，点「载入」—— <b>只需粘这一次，以后自动记住</b></div>
               </div>
             </div>
-            <div class="field"><label>service_role key</label><input class="input" type="password" v-model="accMgr.key" placeholder="粘贴 eyJ... 开头的一长串"></div>
+            <div class="field"><label>service_role key</label>
+              <div class="pw-wrap">
+                <input class="input" :type="pwShow.adminKey ? 'text' : 'password'" v-model="accMgr.key" placeholder="粘贴 eyJ... 开头的一长串">
+                <button type="button" class="pw-eye" :class="{on: pwShow.adminKey}" @click="togglePw('adminKey')" :title="pwShow.adminKey ? '隐藏' : '显示'" :aria-label="pwShow.adminKey ? '隐藏' : '显示'">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="2.9" stroke="currentColor" stroke-width="1.7"/>
+                    <path v-if="pwShow.adminKey" d="M4 20L20 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
               <span style="font-size:11.5px;color:var(--text-mute)">🔒 只存本机，不上传、不写进网站</span>
               <button class="btn" @click="saveAdminKey" :disabled="accMgr.busy">载入并查看账号</button>
@@ -3563,7 +3597,18 @@ const App = {
       <div class="modal" style="max-width:440px">
         <div class="modal-head"><span>修改密码 · {{accName(accMgr.editPw)}}</span><button class="modal-close" @click="accMgr.editPw=null">✕</button></div>
         <div class="modal-body">
-          <div class="field"><label>新密码</label><input class="input" v-model="accMgr.newPw"></div>
+          <div class="field"><label>新密码</label>
+            <div class="pw-wrap">
+              <input class="input" :type="pwShow.adminEdit ? 'text' : 'password'" v-model="accMgr.newPw">
+              <button type="button" class="pw-eye" :class="{on: pwShow.adminEdit}" @click="togglePw('adminEdit')" :title="pwShow.adminEdit ? '隐藏' : '显示'" :aria-label="pwShow.adminEdit ? '隐藏' : '显示'">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="2.9" stroke="currentColor" stroke-width="1.7"/>
+                  <path v-if="pwShow.adminEdit" d="M4 20L20 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
           <div class="acc-tip" v-if="pwIssue(accMgr.newPw)" style="color:var(--danger)">⚠ {{pwIssue(accMgr.newPw)}}</div>
           <div class="acc-tip" v-else style="color:#2f855a">✓ 强度合格</div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
