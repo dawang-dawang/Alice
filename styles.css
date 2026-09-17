@@ -673,3 +673,42 @@ textarea.input { min-height: 132px; resize: vertical; line-height: 1.65; font-fa
 @media (max-width: 640px) {
   .cal-mood { top: 2px; right: 4px; font-size: 11px; }
 }
+
+/* =========================================================
+   v20260917ea 手机端工作台比例优化（对标 iPhone 17 标准版 402pt 宽）
+   ①容器边距收窄，内容宽度最大化 ②卡片图标/操作按钮重新配比，文字区更宽
+   ③字号整体上调一档（手机阅读友好）④chip/触摸目标加大 ⑤弹窗表单单列化
+   回滚：整块删除即可
+   ========================================================= */
+@media (max-width: 640px) {
+  /* 容器：压缩左右边距（16→13），402pt 屏多出 6pt 内容宽度 */
+  .main { padding: 12px 13px 60px; }
+
+  /* 分类栏容器 */
+  .wb-col { padding: 10px 10px 11px; border-radius: 13px; }
+  .wb-col-head { gap: 6px; padding-bottom: 7px; margin-bottom: 8px; }
+  .wb-col-name { font-size: 14.5px; }
+  .wb-col-num { font-size: 11.5px; }
+  .wb-col-empty { font-size: 12.5px; }
+
+  /* 卡片：图标略缩、间距收紧，把宽度让给文字 */
+  .wb-card { gap: 10px; padding: 11px 12px; border-radius: 13px; }
+  .wb-ico { width: 36px; height: 36px; border-radius: 10px; font-size: 16px; }
+  .wb-name { font-size: 15px; }
+  .wb-url { font-size: 12px; margin-top: 1px; }
+  .wb-lines { margin-top: 4px; }
+  .wb-line { font-size: 12.5px; gap: 6px; }
+
+  /* 操作按钮：30px 好按且少挤压；复制/显隐小钮 26px */
+  .wb-ops { gap: 3px; }
+  .wb-ops .icon-btn { width: 30px; height: 30px; font-size: 13px; border-radius: 9px; }
+  .wb-mini { height: 26px; min-width: 26px; font-size: 12px; border-radius: 8px; }
+  .wb-move button { width: 28px; height: 22px; font-size: 11px; }
+
+  /* 筛选 chips：触摸目标加大到 ~32px 高 */
+  .toolbar { margin-bottom: 12px; }
+  .toolbar .chip { padding: 7px 14px; font-size: 12.5px; }
+
+  /* 添加/编辑弹窗表单：名称与分类、账号与密码改单列，输入框全宽好填写 */
+  .pl-grid { grid-template-columns: 1fr; gap: 0; }
+}
