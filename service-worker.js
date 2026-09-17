@@ -4,18 +4,18 @@
    - 其余同源静态资源缓存优先、miss 时下载并缓存 → 日常打开秒开
    版本号：改 app.js/styles.css 等资源时，把 CACHE 名 bump 一次即可（旧缓存自动清理）
 */
-const CACHE = "lifewb-20260917ei";
+const CACHE = "lifewb-20260917ej";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./styles.css?v=20260917ei",
-  "./app.js?v=20260917ei",
-  "./foods_base.js?v=20260917ei",
+  "./styles.css?v=20260917ej",
+  "./app.js?v=20260917ej",
+  "./foods_base.js?v=20260917ej",
   "./vue.global.prod.js",
   "./lunar.js",
   "./plantlib.js",
   "./manifest.webmanifest?v=20260811cw",
-  "./icons/工作平台.svg?v=20260917ei",
+  "./icons/工作平台.svg?v=20260917ej",
 ];
 
 self.addEventListener("install", (e) => {
@@ -32,33 +32,45 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+/* 页面导航请求：网络优先。单独处理，避免把 HTML 当普通资源缓存优先（否则永远拿不到新版） */
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
-  const url = new URL(req.url);
+
+  let url;
+  try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== location.origin) return;
-  const isHtml = !/\.[a-z0-9]+(\?|$)/i.test(url.pathname);
-  if (isHtml) {
-    // 页面：网络优先（禁用 HTTP 缓存，永远拿最新入口）→ 新版本号资源随之更新；离线时回退缓存
+
+  /* 导航请求：优先按 request.mode 判断，退化到扩展名判断（兼容各浏览器） */
+  const isNavigate = req.mode === "navigate" || !/\.[a-z0-9]+(\?|$)/i.test(url.pathname);
+  if (isNavigate) {
     e.respondWith(
       fetch(req, { cache: "no-store" })
         .then((r) => {
-          const cl = r.clone();
-          caches.open(CACHE).then((c) => c.put(req, cl));
+          if (r && r.ok) {
+            const cl = r.clone();
+            /* 用 waitUntil 保住缓存写入，防止 SW 被回收导致 put 中断 */
+            e.waitUntil(caches.open(CACHE).then((c) => c.put(req, cl)).catch(() => {}));
+          }
           return r;
         })
-        .catch(() => caches.match(req).then((m) => m || caches.match("./index.html")))
+        .catch(() =>
+          caches.match(req)
+            .then((m) => m || caches.match("./index.html"))
+            .then((m) => m || new Response("离线且无缓存", { status: 503, headers: { "Content-Type": "text/plain;charset=utf-8" } }))
+        )
     );
     return;
   }
-  // 资源：缓存优先
+
+  // 其余静态资源：缓存优先
   e.respondWith(
     caches.match(req).then((hit) => {
       if (hit) return hit;
       return fetch(req).then((r) => {
         if (r && r.ok) {
           const cl = r.clone();
-          caches.open(CACHE).then((c) => c.put(req, cl));
+          e.waitUntil(caches.open(CACHE).then((c) => c.put(req, cl)).catch(() => {}));
         }
         return r;
       });
