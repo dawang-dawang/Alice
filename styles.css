@@ -129,6 +129,19 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .input, .select, .textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fffdf9; outline: none; transition: .15s; }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
 .textarea { resize: vertical; min-height: 72px; }
+/* 密码框 + 显示/隐藏眼睛图标 */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap .input { padding-right: 40px; }
+.pw-eye {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-mute); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: .15s;
+}
+.pw-eye svg { width: 17px; height: 17px; display: block; }
+.pw-eye:hover { background: var(--green-soft); color: var(--green-deep); }
+.pw-eye.on { color: var(--green-deep); }
+.pw-eye:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 /* 植物详情页养护记录表单：两列等宽网格，各框同宽对齐 */
 .pl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pl-grid .field { min-width: 0; }
