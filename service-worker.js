@@ -4,13 +4,13 @@
    - 其余同源静态资源缓存优先、miss 时下载并缓存 → 日常打开秒开
    版本号：改 app.js/styles.css 等资源时，把 CACHE 名 bump 一次即可（旧缓存自动清理）
 */
-const CACHE = "lifewb-20260917eb";
+const CACHE = "lifewb-20260917ec";
 const PRECACHE = [
   "./",
   "./index.html",
-  "./styles.css?v=20260917eb",
-  "./app.js?v=20260917eb",
-  "./foods_base.js?v=20260917eb",
+  "./styles.css?v=20260917ec",
+  "./app.js?v=20260917ec",
+  "./foods_base.js?v=20260917ec",
   "./vue.global.prod.js",
   "./lunar.js",
   "./plantlib.js",
@@ -38,9 +38,9 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== location.origin) return;
   const isHtml = !/\.[a-z0-9]+(\?|$)/i.test(url.pathname);
   if (isHtml) {
-    // 页面：网络优先，离线时回退缓存
+    // 页面：网络优先（禁用 HTTP 缓存，永远拿最新入口）→ 新版本号资源随之更新；离线时回退缓存
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-store" })
         .then((r) => {
           const cl = r.clone();
           caches.open(CACHE).then((c) => c.put(req, cl));
