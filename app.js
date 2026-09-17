@@ -119,8 +119,25 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de", workbench: "icons/工作台.svg?v=20260908dn" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de", workbench: "icons/工作平台.svg?v=20260917ee" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
+
+/* 节日名简称：格子里空间有限，长名压缩成 2-4 字，保证完整显示不被截断 */
+const HOLIDAY_SHORT = {
+  "中秋节": "中秋", "国庆节": "国庆", "国庆中秋": "双节", "端午节": "端午",
+  "劳动节": "劳动", "元旦": "元旦", "春节": "春节", "清明节": "清明",
+  "重阳节": "重阳", "冬至": "冬至", "七夕": "七夕", "元宵节": "元宵",
+  "儿童节": "儿童", "教师节": "教师", "妇女节": "妇女", "植树节": "植树",
+  "情人节": "情人", "平安夜": "平安", "圣诞节": "圣诞", "感恩节": "感恩",
+  "除夕": "除夕", "小年": "小年",
+};
+function holidayShort(n) {
+  const s = String(n || "").trim();
+  if (!s) return "";
+  if (HOLIDAY_SHORT[s]) return HOLIDAY_SHORT[s];
+  if (s.length > 4) return s.replace(/节$/, "").slice(0, 4);
+  return s;
+}
 
 /* SVG 环形图 */
 function svgPie(data) {
@@ -585,7 +602,7 @@ const Dashboard = {
       { key: "plants", ico: "plants", name: "植物", num: plantsTotal.value + " 株", badge: plantsNeed.value || 0 },
       { key: "sport", ico: "sport", name: "运动", num: "已消耗 " + sportToday.value.burn + " kcal", badge: 0 },
       { key: "baby", ico: "baby", name: "宝宝", num: babyCount.value + " 条记录", badge: 0 },
-      { key: "workbench", ico: "workbench", name: "工作台", num: (state.workbench ? state.workbench.length : 0) + " 个网址", badge: 0 },
+      { key: "workbench", ico: "workbench", name: "工作平台", num: (state.workbench ? state.workbench.length : 0) + " 个网址", badge: 0 },
     ]));
 
     /* 宝宝成长曲线（体重/身高/头围 × 月龄，与宝宝养育一致，含国标 P50 中位虚线） */
@@ -932,7 +949,7 @@ const Tasks = {
     }
     function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
 
-    return { MOODS, WK, today, view, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties };
+    return { MOODS, WK, today, view, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties, holidayShort };
   },
   template: `
   <div>
@@ -960,10 +977,10 @@ const Tasks = {
           <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel, 'has-duty':!!c.dutyColor, wk:c.wk, hol:c.hkind==='hol', workday:c.hkind==='work'}" :style="c.dutyColor?{'--duty':c.dutyColor}:null" @click="pick(c.ds)" :title="(c.dutyNames?('值班：'+c.dutyNames+'　'):'')+(c.hkind==='work'?'调休上班':(c.hname||''))">
             <div class="cal-top">
               <span class="cal-day" :class="{todo:c.hasUndone, alldone:c.allDone}">{{c.day}}</span>
-              <span v-if="c.hname" class="cal-fest" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}">{{c.hname}}</span>
               <span v-if="c.dutyColor" class="cal-duty-dot" :style="{background:c.dutyColor}"></span>
               <span v-if="c.mood" class="cal-mood" :title="'心情：' + ((MOODS.find(m=>m.k===c.mood)||{}).t || '')">{{(MOODS.find(m=>m.k===c.mood)||{}).e}}</span>
             </div>
+            <div v-if="c.hname" class="cal-fest" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}" :title="c.hname">{{holidayShort(c.hname)}}</div>
             <div class="cal-list">
               <div v-for="td in c.tds" :key="td.id" class="cal-td" :class="{done:td.done, duty:td.src==='duty'}" :style="td.src==='duty'?{color:dutyColorOf(td)}:null">{{td.done?'✓ ':''}}{{td.short || td.title}}</div>
               <div v-if="c.more" class="cal-td more">+{{c.more}} 项</div>
@@ -1409,7 +1426,7 @@ const Workbench = {
   template: `
   <div>
     <div class="module-head">
-      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('workbench')"></span>工作台</div><div class="module-desc">常用网站快捷入口，点击卡片直接跳转</div></div>
+      <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('workbench')"></span>工作平台</div><div class="module-desc">常用网站快捷入口，点击卡片直接跳转</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn gray" @click="sortMode=!sortMode">{{sortMode?'完成排序':'⇅ 调整位置'}}</button>
         <button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button>
@@ -3034,7 +3051,7 @@ const App = {
       { key: "home", ico: "home", name: "首页" },
       { key: "tasks", ico: "tasks", name: "日程管理" },
       { key: "memo", ico: "memo", name: "记录生活" },
-      { key: "workbench", ico: "workbench", name: "工作台" },
+      { key: "workbench", ico: "workbench", name: "工作平台" },
       { key: "anniv", ico: "anniv", name: "纪念日" },
       { key: "finance", ico: "finance", name: "理财管理" },
       { key: "sport", ico: "sport", name: "减脂管理" },
