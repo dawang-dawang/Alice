@@ -119,7 +119,7 @@ function iconSvg(name) {
   return ICON_SVGS[name] || ICON_SVGS.home;
 }
 /* 模块 → Hello Kitty PNG 图标（log/ 文件夹，加版本号强制刷新缓存） */
-const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de", workbench: "icons/工作平台.svg?v=20260917ee" };
+const HK_ICONS = { home: "icons/首页.png?v=20260811de", tasks: "icons/日程管理.png?v=20260811de", memo: "icons/备忘录.png?v=20260811de", anniv: "icons/纪念日.png?v=20260811de", finance: "icons/理财管理.png?v=20260811de", sport: "icons/减脂管理.png?v=20260811de", plants: "icons/我的植物.png?v=20260811de", baby: "icons/宝宝养育.png?v=20260811de", express: "icons/表达能力.png?v=20260811de", brain: "icons/前额叶训练.png?v=20260811de", workbench: "icons/工作平台.svg?v=20260917ef" };
 function iconFor(name) { return HK_ICONS[name] || HK_ICONS.home; }
 
 /* 节日名简称：格子里空间有限，长名压缩成 2-4 字，保证完整显示不被截断 */
@@ -977,10 +977,11 @@ const Tasks = {
           <div v-for="c in w" :key="c.ds" class="cal-cell" :class="{cur:c.cur, other:!c.cur, today:c.isToday, sel:c.ds===sel, 'has-duty':!!c.dutyColor, wk:c.wk, hol:c.hkind==='hol', workday:c.hkind==='work'}" :style="c.dutyColor?{'--duty':c.dutyColor}:null" @click="pick(c.ds)" :title="(c.dutyNames?('值班：'+c.dutyNames+'　'):'')+(c.hkind==='work'?'调休上班':(c.hname||''))">
             <div class="cal-top">
               <span class="cal-day" :class="{todo:c.hasUndone, alldone:c.allDone}">{{c.day}}</span>
+              <span v-if="c.hname && holidayShort(c.hname).length < 2" class="cal-fest inline" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}" :title="c.hname">{{holidayShort(c.hname)}}</span>
               <span v-if="c.dutyColor" class="cal-duty-dot" :style="{background:c.dutyColor}"></span>
               <span v-if="c.mood" class="cal-mood" :title="'心情：' + ((MOODS.find(m=>m.k===c.mood)||{}).t || '')">{{(MOODS.find(m=>m.k===c.mood)||{}).e}}</span>
             </div>
-            <div v-if="c.hname" class="cal-fest" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}" :title="c.hname">{{holidayShort(c.hname)}}</div>
+            <div v-if="c.hname && holidayShort(c.hname).length > 1" class="cal-fest" :class="{hol:c.hkind==='hol', work:c.hkind==='work', fest:c.hkind==='fest'}" :title="c.hname">{{holidayShort(c.hname)}}</div>
             <div class="cal-list">
               <div v-for="td in c.tds" :key="td.id" class="cal-td" :class="{done:td.done, duty:td.src==='duty'}" :style="td.src==='duty'?{color:dutyColorOf(td)}:null">{{td.done?'✓ ':''}}{{td.short || td.title}}</div>
               <div v-if="c.more" class="cal-td more">+{{c.more}} 项</div>
