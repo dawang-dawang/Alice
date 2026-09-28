@@ -12,7 +12,7 @@ const LS = {
 };
 
 /* 工作台全部数据键（本地 / 云端共用同一份结构） */
-const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
+const KEYS = ["tasks", "memos", "memoCats", "plants", "sportProfile", "sportActs", "sport", "weights", "finance", "financeCats", "anniv", "babyProfile", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
 
 /* 纯本地使用：数据存浏览器 localStorage，无需登录账号 */
 
@@ -160,11 +160,46 @@ function svgPie(data) {
 /* SVG 折线图（x 为月数或时间戳）
    opt：{ yMin, yMax } 固定 Y 轴范围（数据超出时自动扩展，保证点完整可见）
         { dotClick, dotClass } 圆点可点击：画一层透明大圆做热区，data-id 带记录 id，父容器事件委托即可 */
+/* ---------- 折线图 X 轴日期刻度 ----------
+   opt.xDate = true 时，在底部按数据点的时间范围画日期刻度（自动避免文字重叠） */
+function svgXAxisDates(xmin, xmax, sx, H, padB) {
+  if (!(xmax > xmin)) {
+    /* 只有一个点：居中显示该点日期 */
+    const d = new Date(xmin);
+    const s = (d.getMonth() + 1) + "/" + d.getDate();
+    return '<text x="' + sx(xmin).toFixed(1) + '" y="' + (H - padB + 15) + '" font-size="10" fill="#a2b1aa" text-anchor="middle">' + s + "</text>";
+  }
+  const spanDay = (xmax - xmin) / 86400000;           // 跨度（天）
+  /* 目标刻度数：跨度越长给越多，但最多 6 个，且同屏不重叠 */
+  let n = spanDay <= 1 ? 2 : spanDay <= 3 ? 3 : spanDay <= 10 ? 4 : spanDay <= 45 ? 5 : 6;
+  const totalW = sx(xmax) - sx(xmin);
+  /* 按可用宽度再压一次：每天至少 ~52px，避免 7/1 7/2 挤在一起 */
+  const maxFit = Math.max(2, Math.floor(totalW / 52) + 1);
+  n = Math.min(n, maxFit);
+  if (n < 2) return "";
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    const x = xmin + (xmax - xmin) * (i / (n - 1));
+    const d = new Date(Math.round(x));
+    const s = (d.getMonth() + 1) + "/" + d.getDate();
+    /* 首尾刻度贴边时改用 start/end 对齐，防止超出画布 */
+    let anchor = "middle";
+    if (i === 0) anchor = "start";
+    if (i === n - 1) anchor = "end";
+    out += '<text x="' + sx(x).toFixed(1) + '" y="' + (H - padB + 15) + '" font-size="10" fill="#a2b1aa" text-anchor="' + anchor + '">' + s + "</text>";
+    /* 刻度线：短竖线，帮助对齐 */
+    out += '<line x1="' + sx(x).toFixed(1) + '" y1="' + (H - padB) + '" x2="' + sx(x).toFixed(1) + '" y2="' + (H - padB + 3) + '" stroke="#dbe4e0"></line>';
+  }
+  return out;
+}
+
 function svgLine(series, colors, xLabel, opt) {
   opt = opt || {};
   const all = []; Object.values(series).forEach((a) => a.forEach((p) => all.push(p)));
   if (!all.length) return "";
   const W = 560, H = 210, padL = 38, padB = 28, padT = 12, padR = 14;
+  /* 有日期刻度时，底部多留一点空间 */
+  const padB2 = opt.xDate ? padB + 4 : padB;
   const xs = all.map((p) => p.x); const xmin = Math.min(...xs), xmax = Math.max(...xs);
   let ymin = 0; let ymax = Math.max(...all.map((p) => p.y)) * 1.12 || 1;
   if (opt.yMin != null && opt.yMax != null) {
@@ -174,14 +209,16 @@ function svgLine(series, colors, xLabel, opt) {
     if (dmax > ymax) ymax = Math.ceil(dmax + 2);
   }
   const sx = (x) => padL + (xmax === xmin ? (W - padL - padR) / 2 : (x - xmin) / (xmax - xmin) * (W - padL - padR));
-  const sy = (y) => H - padB - (y - ymin) / (ymax - ymin) * (H - padT - padB);
+  const sy = (y) => H - padB2 - (y - ymin) / (ymax - ymin) * (H - padT - padB2);
   let grid = "";
   for (let i = 0; i <= 4; i++) {
-    const y = padT + i * (H - padT - padB) / 4;
+    const y = padT + i * (H - padT - padB2) / 4;
     const val = ymin + (ymax - ymin) * (1 - i / 4);
     const txt = Math.abs(val - Math.round(val)) < 0.05 ? String(Math.round(val)) : val.toFixed(1);
     grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#eef2f0"></line><text x="4" y="' + (y + 4) + '" font-size="10" fill="#a2b1aa">' + txt + "</text>";
   }
+  /* 底部日期刻度（可选） */
+  if (opt.xDate) grid += svgXAxisDates(xmin, xmax, sx, H, padB2);
   let paths = "";
   Object.keys(series).forEach((k) => {
     const arr = series[k]; if (!arr.length) return;
@@ -219,6 +256,7 @@ const state = reactive({
   sport: [],
   weights: [],
   finance: [],
+  financeCats: [],
   anniv: [],
   babyProfile: { name: "", birth: "" },
   baby: [],
@@ -245,6 +283,7 @@ function seedIfEmpty() {
   state.sportActs = SPORT_ACTS_BUILTIN.map((a) => ({ id: uid(), name: a.name, kcalPerMin: a.kcalPerMin, custom: false }));
   state.sport = [];
   state.finance = [];
+  state.financeCats = [];
   state.anniv = [];
   state.babyProfile = {};
   state.baby = [];
@@ -495,7 +534,7 @@ async function adminDeleteUser(user) {
 function lastSync() { return authState.user ? (localStorage.getItem("lifeWB:lastSync:" + authState.user.id) || "") : ""; }
 function setLastSync(t) { if (authState.user) localStorage.setItem("lifeWB:lastSync:" + authState.user.id, t || ""); }
 /* 用户真正录入的数据 key（不含 sportActs/sportProfile/babyProfile 等内置或默认结构，避免误判"云端有数据"） */
-const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
+const USER_DATA_KEYS = ["tasks", "memos", "memoCats", "plants", "sport", "weights", "finance", "financeCats", "anniv", "baby", "moods", "expressStart", "brainBest", "brainLast", "workbench", "workbenchCats", "duties"];
 function localHasData() {
   return USER_DATA_KEYS.some((k) => {
     const v = state[k];
@@ -2286,7 +2325,7 @@ const Sport = {
     function delW(id) { state.weights = state.weights.filter((x) => x.id !== id); }
     const wlist = computed(() => [...state.weights].sort((a, b) => (b.date < a.date ? -1 : 1)));
     const wSeries = computed(() => { const pts = [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1)).map((w) => ({ x: new Date(w.date).getTime(), y: w.weight, id: w.id, tip: w.date + " · " + w.weight + "kg（点击修改）" })); return { "体重(kg)": pts }; });
-    const wChartHtml = computed(() => (wSeries.value["体重(kg)"].length ? svgLine(wSeries.value, { "体重(kg)": "#c08457" }, "日期", { yMin: 40, yMax: 70, dotClick: true, dotClass: "wdot" }) : ""));
+    const wChartHtml = computed(() => (wSeries.value["体重(kg)"].length ? svgLine(wSeries.value, { "体重(kg)": "#c08457" }, "日期", { yMin: 40, yMax: 70, dotClick: true, dotClass: "wdot", xDate: true }) : ""));
     const wTrend = computed(() => { if (wlist.value.length < 2) return null; const latest = +wlist.value[0].weight, prev = +wlist.value[1].weight; return { diff: +(latest - prev).toFixed(1) }; });
 
     /* 点击曲线圆点 → 查看/修改/删除该次记录（v-html 渲染的 SVG 无法用 @click，走父容器事件委托） */
@@ -2492,15 +2531,72 @@ const Finance = {
   setup() {
     const filter = ref("全部");
     const typeF = ref("全部");
+    const catF = ref("全部");   // 按分类筛选
     const form = reactive({ show: false, title: "记支出", id: null, type: "expense", amount: 0, category: "餐饮", date: todayStr(), note: "" });
-    const expCats = ["餐饮", "房租", "购物", "交通", "育儿", "医疗", "娱乐", "教育", "理财收益", "其他"];
-    const incCats = ["工资", "理财收益", "红包", "兼职", "其他"];
+    /* 内置默认分类（不可删，用户可另建自定义分类） */
+    const DEF_EXP = ["餐饮", "房租", "购物", "交通", "育儿", "医疗", "娱乐", "教育", "理财收益", "其他"];
+    const DEF_INC = ["工资", "理财收益", "红包", "兼职", "其他"];
+    const manage = ref(false);   // 分类管理开关
+    const catForm = reactive({ show: false, title: "新增分类", id: null, name: "", type: "expense" });
 
+    const myCats = (type) => (state.financeCats || []).filter((c) => (c.type || "expense") === type);    /* 可选分类 = 自定义在前（顺序可调） + 内置默认（去掉重名） */
+    function catsOf(type) {
+      const mine = myCats(type).map((c) => c.name);
+      const def = type === "income" ? DEF_INC : DEF_EXP;
+      return mine.concat(def.filter((n) => mine.indexOf(n) < 0));
+    }
+    const expCats = computed(() => catsOf("expense"));
+    const incCats = computed(() => catsOf("income"));
+    function cats() { return form.type === "income" ? incCats.value : expCats.value; }
+
+    function openCatAdd(type) { Object.assign(catForm, { show: true, title: "新增分类", id: null, name: "", type: type || "expense" }); }
+    function openCatEdit(c) { Object.assign(catForm, { show: true, title: "重命名分类", id: c.id, name: c.name, type: c.type || "expense" }); }
+    function saveCat() {
+      const nm = (catForm.name || "").trim();
+      if (!nm) return showToast("填分类名");
+      if (catForm.id) {
+        const c = (state.financeCats || []).find((x) => x.id === catForm.id);
+        if (!c) return;
+        const old = c.name; const t = c.type || "expense";
+        c.name = nm; c.type = catForm.type;
+        if (old !== nm || t !== catForm.type) {
+          state.finance.forEach((r) => { if (r.type === t && r.category === old) r.category = nm; });
+        }
+      } else {
+        if (catsOf(catForm.type).indexOf(nm) >= 0) { catForm.show = false; return showToast("这个分类已经有了"); }
+        (state.financeCats || (state.financeCats = [])).push({ id: uid(), name: nm, type: catForm.type });
+      }
+      catForm.show = false; showToast("已保存");
+    }
+    function delCat(id) {
+      const c = (state.financeCats || []).find((x) => x.id === id);
+      if (!c) return;
+      const t = c.type || "expense";
+      const used = state.finance.filter((r) => r.type === t && r.category === c.name).length;
+      state.financeCats = (state.financeCats || []).filter((x) => x.id !== id);
+      if (!used) { showToast("分类已删除"); return; }
+      const def = t === "income" ? DEF_INC : DEF_EXP;
+      state.finance.forEach((r) => { if (r.type === t && r.category === c.name) r.category = def[def.length - 1]; });
+      showToast("分类已删除，" + used + " 条记录归入「" + def[def.length - 1] + "」");
+    }
+    function moveCat(id, dir) {
+      const arr = state.financeCats || [];
+      const c = arr.find((x) => x.id === id);
+      if (!c) return;
+      const t = c.type || "expense";
+      const idxs = arr.map((x, i) => ({ x, i })).filter((o) => (o.x.type || "expense") === t).map((o) => o.i);
+      const at = idxs.indexOf(arr.findIndex((x) => x.id === id));
+      const to = at + dir;
+      if (at < 0 || to < 0 || to >= idxs.length) return;
+      const i = idxs[at], j = idxs[to];
+      const t2 = arr[i]; arr[i] = arr[j]; arr[j] = t2;
+      state.financeCats = [...arr];
+    }
     function inRange(d) { const t = todayStr(); if (filter.value === "今日") return d === t; if (filter.value === "本月") return d.slice(0, 7) === t.slice(0, 7); if (filter.value === "本周") { const diff = dayDiff(d, t); const wd = new Date(t).getDay(); return diff >= -wd && diff < 7 - wd; } return true; }
     const sum = (arr, type) => arr.filter((r) => r.type === type && inRange(r.date)).reduce((s, r) => s + (+r.amount || 0), 0);
     const stat = computed(() => { const a = state.finance; return { inc: sum(a, "income"), exp: sum(a, "expense") }; });
     const statBal = computed(() => stat.value.inc - stat.value.exp);
-    const list = computed(() => state.finance.filter((r) => inRange(r.date) && (typeF.value === "全部" || r.type === typeF.value)).sort((a, b) => (b.date < a.date ? -1 : 1)));
+    const list = computed(() => state.finance.filter((r) => inRange(r.date) && (typeF.value === "全部" || r.type === typeF.value) && (catF.value === "全部" || r.category === catF.value)).sort((a, b) => (b.date < a.date ? -1 : 1)));
 
     const expByCat = computed(() => { const m = {}; state.finance.filter((r) => r.type === "expense").forEach((r) => (m[r.category] = (m[r.category] || 0) + (+r.amount || 0))); return m; });
     const incByCat = computed(() => { const m = {}; state.finance.filter((r) => r.type === "income").forEach((r) => (m[r.category] = (m[r.category] || 0) + (+r.amount || 0))); return m; });
@@ -2511,19 +2607,43 @@ const Finance = {
     function openEdit(r) { Object.assign(form, { show: true, title: r.type === "income" ? "编辑收入" : "编辑支出", id: r.id, type: r.type, amount: r.amount, category: r.category, date: r.date, note: r.note || "" }); }
     function save() { if (!form.amount) return showToast("填金额"); if (form.id) { const r = state.finance.find((x) => x.id === form.id); if (r) Object.assign(r, { type: form.type, amount: +form.amount, category: form.category, date: form.date, note: form.note.trim() }); } else state.finance.push({ id: uid(), type: form.type, amount: +form.amount, category: form.category, date: form.date, note: form.note.trim() }); form.show = false; showToast("已保存"); }
     function del(id) { state.finance = state.finance.filter((x) => x.id !== id); showToast("已删除"); }
-    function cats() { return form.type === "income" ? incCats : expCats; }
-    return { filter, typeF, form, expCats, incCats, stat, statBal, list, incPie, expPie, open, openEdit, save, del, cats };
+    /* 删除/改名时，记录里的分类跟着走（自建分类删除 → 归入「其他」） */
+    return { filter, typeF, catF, form, expCats, incCats, stat, statBal, list, incPie, expPie, open, openEdit, save, del, cats, manage, catForm, myCats, DEF_EXP, DEF_INC, openCatAdd, openCatEdit, saveCat, delCat, moveCat };
   },
   template: `
   <div>
     <div class="module-head">
       <div><div class="module-title"><span class="mt-ico"><img :src="iconFor('finance')"></span>理财管理</div><div class="module-desc">收支台账，结余一目了然</div></div>
-      <div style="display:flex;gap:8px"><button class="btn line" @click="open('income')">＋ 收入</button><button class="btn" @click="open('expense')">＋ 支出</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn gray" @click="manage=!manage">{{manage?'完成':'管理分类'}}</button><button class="btn line" @click="open('income')">＋ 收入</button><button class="btn" @click="open('expense')">＋ 支出</button></div>
     </div>
     <div class="stats">
       <div class="stat"><div class="v">{{stat.inc}}</div><div class="k">{{filter}}收入</div></div>
       <div class="stat"><div class="v warn">{{stat.exp}}</div><div class="k">{{filter}}支出</div></div>
       <div class="stat"><div class="v">{{statBal}}</div><div class="k">{{filter}}结余</div></div>
+    </div>
+    <div v-if="manage" class="card" style="margin-bottom:14px">
+      <div style="font-weight:700;margin-bottom:10px">🏷 我的支出分类</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span v-for="c in myCats('expense')" :key="c.id" class="chip active" style="cursor:default">{{c.name}}
+          <span style="margin-left:4px" @click="moveCat(c.id,-1)" title="前移">←</span>
+          <span style="margin-left:3px" @click="moveCat(c.id,1)" title="后移">→</span>
+          <span style="margin-left:3px" @click="openCatEdit(c)">✎</span>
+          <span style="margin-left:2px;color:var(--danger)" @click="delCat(c.id)">✕</span>
+        </span>
+        <button class="chip" @click="openCatAdd('expense')">＋ 新增支出分类</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-mute);margin:8px 0 6px">内置分类：{{DEF_EXP.join('、')}}（始终可用，不会被删掉）</div>
+      <div style="font-weight:700;margin:14px 0 10px">🏷 我的收入分类</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span v-for="c in myCats('income')" :key="c.id" class="chip active" style="cursor:default">{{c.name}}
+          <span style="margin-left:4px" @click="moveCat(c.id,-1)" title="前移">←</span>
+          <span style="margin-left:3px" @click="moveCat(c.id,1)" title="后移">→</span>
+          <span style="margin-left:3px" @click="openCatEdit(c)">✎</span>
+          <span style="margin-left:2px;color:var(--danger)" @click="delCat(c.id)">✕</span>
+        </span>
+        <button class="chip" @click="openCatAdd('income')">＋ 新增收入分类</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-mute);margin-top:8px">内置分类：{{DEF_INC.join('、')}}</div>
     </div>
     <div class="grid cards-2">
       <div style="display:flex;flex-direction:column;gap:14px">
@@ -2547,6 +2667,7 @@ const Finance = {
         <button class="chip" :class="{active:typeF==='全部'}" @click="typeF='全部'">全部类型</button>
         <button class="chip" :class="{active:typeF==='income'}" @click="typeF='income'">收入</button>
         <button class="chip" :class="{active:typeF==='expense'}" @click="typeF='expense'">支出</button>
+        <select class="select" style="max-width:130px" v-model="catF"><option value="全部">全部分类</option><option v-for="c in expCats.concat(incCats.filter(x=>expCats.indexOf(x)<0))" :key="c" :value="c">{{c}}</option></select>
       </div>
       <table class="tbl" v-if="list.length"><thead><tr><th>日期</th><th>类型</th><th>分类</th><th>金额</th><th>备注</th><th></th></tr></thead><tbody>
         <tr v-for="r in list" :key="r.id"><td>{{r.date}}</td><td><span class="tag" :class="r.type==='income'?'blue':'red'">{{r.type==='income'?'收入':'支出'}}</span></td><td>{{r.category}}</td><td :style="{color:r.type==='income'?'var(--green-deep)':'var(--danger)','font-weight':600}">{{r.type==='income'?'+':'−'}}{{r.amount}}</td><td style="color:var(--text-mute)">{{r.note}}</td><td><button class="icon-btn" @click="openEdit(r)" title="编辑">✏️</button><button class="icon-btn danger" @click="del(r.id)" title="删除">🗑️</button></td></tr>
@@ -2558,11 +2679,17 @@ const Finance = {
     <modal :show="form.show" :title="form.title" @close="form.show=false">
       <div class="pl-grid">
         <div class="field"><label>金额</label><input class="input" type="number" step="0.01" v-model="form.amount"></div>
-        <div class="field"><label>分类</label><select class="select" v-model="form.category"><option v-for="c in cats()" :key="c" :value="c">{{c}}</option></select></div>
+        <div class="field"><label>分类</label><select class="select" v-model="form.category"><option v-for="c in cats()" :key="c" :value="c">{{c}}</option></select><button type="button" class="chip" style="margin-top:6px" @click="openCatAdd(form.type)">＋ 新建分类</button></div>
         <div class="field"><label>日期</label><input class="input" type="date" v-model="form.date"></div>
         <div class="field"><label>备注</label><input class="input" v-model="form.note"></div>
       </div>
       <div style="text-align:right"><button class="btn" @click="save">保存</button></div>
+    </modal>
+
+    <modal :show="catForm.show" :title="catForm.title" @close="catForm.show=false">
+      <div class="field"><label>分类名称</label><input class="input" v-model="catForm.name" placeholder="如：宠物 / 人情往来"></div>
+      <div class="field"><label>类型</label><select class="select" v-model="catForm.type"><option value="expense">支出分类</option><option value="income">收入分类</option></select></div>
+      <div style="text-align:right"><button class="btn" @click="saveCat">保存</button></div>
     </modal>
   </div>`,
 };
@@ -3350,7 +3477,7 @@ const App = {
     }
     const accOpen = ref(false);
     /* ---------- 账号管理（需 service_role key，仅本机 / 后台使用） ---------- */
-    const accMgr = reactive({ open: false, key: "", users: [], busy: false, loaded: false, editPw: null, newPw: "", reveal: {}, confirmDel: null });
+    const accMgr = reactive({ open: false, key: "", users: [], busy: false, loaded: false, editPw: null, newPw: "", reveal: {}, confirmDel: null, done: null });
     /* key 存 localStorage：贴一次长期有效，关掉浏览器也不丢；不会上传到网站 */
     function adminKeyGet() { try { return localStorage.getItem("lifeWB:adminKey") || ""; } catch (e) { return ""; } }
     /* 管理员 = 登录账号名是「大王」（可在 ADMIN_ACCOUNTS 里扩充） */
@@ -3403,7 +3530,7 @@ const App = {
       return p || "（未记录）";
     }
     function toggleReveal(id) { accMgr.reveal[id] = !accMgr.reveal[id]; }
-    function openEditPw(u) { accMgr.editPw = u; accMgr.newPw = genStrongPw(); }
+    function openEditPw(u) { accMgr.editPw = u; accMgr.newPw = genStrongPw(); accMgr.done = null; }
     function useGenPw() { accMgr.newPw = genStrongPw(); }
     async function saveEditPw() {
       if (!accMgr.editPw) return;
@@ -3411,15 +3538,26 @@ const App = {
       const bad = pwIssue(accMgr.newPw);
       if (bad) return showToast(bad);
       if (accMgr.busy) return;
+      const who = accName(accMgr.editPw);
       accMgr.busy = true;
       try {
         await adminSetPw(accMgr.editPw, accMgr.newPw);
-        showToast("密码已更新为：" + accMgr.newPw + "（请记好）");
-        accMgr.editPw = null; accMgr.newPw = "";
+        /* 结果留在弹窗里，方便复制告知对方（toast 一闪就没了容易错过） */
+        accMgr.done = { who, pw: accMgr.newPw };
+        accMgr.newPw = "";
         await loadUsers();
       } catch (e) { showToast(e.message); }
       accMgr.busy = false;
     }
+    function copyPw() {
+      const t = (accMgr.done && accMgr.done.pw) || "";
+      if (!t) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(() => showToast("新密码已复制"), () => showToast("复制失败，请手动选中"));
+        else showToast("请手动选中复制");
+      } catch (e) { showToast("请手动选中复制"); }
+    }
+    function closeEditPw() { accMgr.editPw = null; accMgr.done = null; accMgr.newPw = ""; }
     function askDel(u) { accMgr.confirmDel = u; }
     async function doDelUser() {
       const u = accMgr.confirmDel;
@@ -3452,7 +3590,7 @@ const App = {
     });
     onUnmounted(() => stopAutoSync());
 
-    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, pwShow, togglePw, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, hasKey, isAdmin, ADMIN_ACCOUNTS, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, askDel, doDelUser };
+    return { current, nav, compMap, badges, todayLabel, goto, toggleMenu, menuOpen, menuPos, menuDown, iconSvg, iconFor, DOG_SVG, fileInput, doExport, doImport, triggerImport, authState, authForm, pwForm, pwShow, togglePw, accOpen, openLogin, openRegister, submitAuth, submitPw, doSyncNow, logout, AUTH_ENABLED, pwIssue, genStrongPw, accMgr, openAccMgr, loadUsers, saveAdminKey, clearAdminKey, canAdmin, hasKey, isAdmin, ADMIN_ACCOUNTS, accName, accPw, toggleReveal, openEditPw, useGenPw, saveEditPw, copyPw, closeEditPw, askDel, doDelUser };
   },
   template: `
   <div class="app">
@@ -3661,10 +3799,22 @@ const App = {
     </div>
 
     <!-- 账号管理 · 修改某账号密码 -->
-    <div class="modal-mask" v-if="accMgr.editPw" @click.self="accMgr.editPw=null">
+    <div class="modal-mask" v-if="accMgr.editPw" @click.self="closeEditPw">
       <div class="modal" style="max-width:440px">
-        <div class="modal-head"><span>修改密码 · {{accName(accMgr.editPw)}}</span><button class="modal-close" @click="accMgr.editPw=null">✕</button></div>
+        <div class="modal-head"><span>修改密码 · {{accName(accMgr.editPw)}}</span><button class="modal-close" @click="closeEditPw">✕</button></div>
         <div class="modal-body">
+          <template v-if="accMgr.done">
+            <div class="acc-tip" style="color:#2f855a;font-weight:600">✓ {{accMgr.done.who}} 的密码已更新</div>
+            <div style="font-size:12px;color:var(--text-mute);margin:2px 0 6px">下面这串新密码只在这次显示，关掉弹窗就看不到了，先记好或复制给对方。</div>
+            <div class="field"><label>新密码</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="input" readonly :value="accMgr.done.pw" style="font-family:ui-monospace,Menlo,Consolas,monospace">
+                <button class="btn gray" style="flex:0 0 auto" @click="copyPw">⧉ 复制</button>
+              </div>
+            </div>
+            <div style="text-align:right"><button class="btn" @click="closeEditPw">知道了</button></div>
+          </template>
+          <template v-else>
           <div class="field"><label>新密码</label>
             <div class="pw-wrap">
               <input class="input" :type="pwShow.adminEdit ? 'text' : 'password'" v-model="accMgr.newPw">
@@ -3683,6 +3833,7 @@ const App = {
             <button class="btn gray" @click="useGenPw">🎲 生成强密码</button>
             <button class="btn" @click="saveEditPw" :disabled="accMgr.busy || !!pwIssue(accMgr.newPw)">{{accMgr.busy ? '保存中…' : '保存'}}</button>
           </div>
+          </template>
         </div>
       </div>
     </div>
