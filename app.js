@@ -397,12 +397,23 @@ function humanAuthErr(msg) {
   if (/password.*should.*be.*at.*least.*6/i.test(m)) return "密码至少 8 位";
   return m;
 }
+/* 网络层失败（NetworkError / TypeError: Failed to fetch）单独翻译，别把英文原文甩给用户 */
+function netErrText(e) {
+  const s = String((e && e.message) || e || "");
+  if (/networkerror|failed to fetch|network request failed|load failed|fetch resource/i.test(s))
+    return "连不上服务器，请检查网络后重试（云备份服务在境外，国内网络可能不稳定）";
+  return s;
+}
+async function safeFetch(url, init) {
+  try { return await fetch(url, init); }
+  catch (e) { throw new Error(netErrText(e)); }
+}
 /* adminKey 有值 → 走管理员身份（账号管理用）；否则走普通用户/匿名 */
 async function supaFetch(path, method, body, anon, extra, adminKey) {
   if (!SUPA_URL || !SUPA_ANON) throw new Error("请先在 index.html 配置 Supabase 地址与 anon key");
   const headers = supaHeaders(anon);
   if (extra) Object.keys(extra).forEach((k) => { headers[k] = extra[k]; });
-  const res = await fetch(SUPA_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await safeFetch(SUPA_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   let j = null;
   try { j = await res.json(); } catch (e) {}
   /* JWT 过期检测：兼容多种字段（error_description / msg / message / error_code / 401+expired 组合） */
@@ -416,7 +427,7 @@ async function supaFetch(path, method, body, anon, extra, adminKey) {
   /* 管理员密钥请求：不走 anon，也不参与 JWT 刷新 */
   if (adminKey) {
     const ha = supaHeaders(false, { "Authorization": "Bearer " + adminKey });
-    const ra = await fetch(SUPA_URL + path, { method, headers: ha, body: body === undefined ? undefined : JSON.stringify(body) });
+    const ra = await safeFetch(SUPA_URL + path, { method, headers: ha, body: body === undefined ? undefined : JSON.stringify(body) });
     let ja = null;
     try { ja = await ra.json(); } catch (e) {}
     if (!ra.ok) {
@@ -431,7 +442,7 @@ async function supaFetch(path, method, body, anon, extra, adminKey) {
     if (refreshOk) {
       const h2 = supaHeaders(anon);
       if (extra) Object.keys(extra).forEach((k) => { h2[k] = extra[k]; });
-      const r2 = await fetch(SUPA_URL + path, { method, headers: h2, body: body === undefined ? undefined : JSON.stringify(body) });
+      const r2 = await safeFetch(SUPA_URL + path, { method, headers: h2, body: body === undefined ? undefined : JSON.stringify(body) });
       let j2 = null;
       try { j2 = await r2.json(); } catch (e) {}
       if (!r2.ok) {
