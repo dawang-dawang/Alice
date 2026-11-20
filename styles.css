@@ -286,6 +286,10 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .today-handle .th-text { flex: 1; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .today-handle .th-text b { color: var(--green-deep); margin-right: 4px; }
 .today-handle .th-go { font-size: 11px; color: var(--text-mute); font-weight: 600; flex-shrink: 0; }
+/* 首页直接勾完成 */
+.today-handle .th-done { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: #fff; color: var(--text-mute); font-size: 14px; line-height: 1; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; transition: .15s; }
+.today-handle .th-done:hover { border-color: var(--green, #5fa98a); color: #fff; background: var(--green, #5fa98a); transform: scale(1.08); }
+.today-handle .th-done:active { transform: scale(.94); }
 .today-handle .th-empty { color: var(--text-mute); font-size: 13px; padding: 8px 0; text-align: center; }
 
 /* 快捷入口区 */
