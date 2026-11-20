@@ -551,8 +551,7 @@ function cloudHasData(d) {
     return false;
   });
 }
-/* 首合同步合并：两端都有数据时按 id/键合并，避免覆盖丢数据（数组按 id 去重，字典按键合并，配置类云端优先） */
-function mergeState(cloud) {
+/* 首合同步合并：两端都有数据时按 id/键合并，避免覆盖丢数据（数组按 id 去重，字典按键合并，配置类云端优先） */function mergeState(cloud) {
   Object.keys(cloud).forEach((k) => {
     if (state[k] === undefined) return;
     const c = cloud[k], l = state[k];
@@ -569,10 +568,37 @@ function mergeState(cloud) {
     }
   });
 }
+/* 值班专项：只补「云端有、本地没有」的条目（按 id 去重，跳过已过去的日期）。
+   值班是全量粘贴导入的快照，多设备下最容易出现「另一台导入了、这边拉不到」，
+   所以这条链路单独做增量补齐，绝不删除本地任何条目。 */
+let dutyClearedAt = 0;   /* 「清空值班记录」的时间戳，60s 内上传不做云端兜底，否则清空不生效 */
+function mergeMissingDuty(cloudArr) {
+  if (!Array.isArray(cloudArr) || !cloudArr.length) return 0;
+  const l = Array.isArray(state.duties) ? state.duties.slice() : [];
+  const ids = new Set(l.map((x) => x && x.id));
+  const t0 = todayStr();
+  let n = 0;
+  cloudArr.forEach((it) => {
+    if (!it || !it.id || ids.has(it.id)) return;
+    if (String(it.date || "") < t0) return;
+    l.push(it); ids.add(it.id); n++;
+  });
+  if (n) { l.sort((a, b) => String(a.date).localeCompare(String(b.date))); state.duties = l; }
+  return n;
+}
 /* 上传：本地 → 云端（upsert 到 wb_data 表，按 uid 一行） */
 async function syncPush() {
   const data = {};
   KEYS.forEach((k) => (data[k] = state[k]));
+  /* 保护：本机值班为空时先取云端那份兜底，避免把其它设备导入的完整值班表整份覆盖成空。
+     60s 内刚点过「清空值班记录」则豁免，保证清空能真正生效。 */
+  if ((!Array.isArray(data.duties) || !data.duties.length) && Date.now() - dutyClearedAt > 60000) {
+    try {
+      const q = await supaFetch("/rest/v1/wb_data?uid=eq." + encodeURIComponent(authState.user.id) + "&select=data", "GET");
+      const cd = Array.isArray(q) && q[0] && q[0].data ? q[0].data.duties : null;
+      if (Array.isArray(cd) && cd.length) { data.duties = cd; state.duties = cd; syncPlanTasks(); }
+    } catch (e) { /* 取不到就按原样上传 */ }
+  }
   const body = { uid: authState.user.id, data, updated_at: new Date().toISOString() };
   const j = await supaFetch("/rest/v1/wb_data?on_conflict=uid", "POST", body, false, { "Prefer": "resolution=merge-duplicates, return=representation" });
   setLastSync(body.updated_at);
@@ -587,15 +613,23 @@ async function syncPull(force) {
   if (!row || !row.data) throw new Error("云端暂无数据，先上传一次");
   /* 保护1：本地已有数据而云端是空数据（被空设备 push 覆盖过）→ 不要用空覆盖本地 */
   if (!force && localHasData() && !cloudHasData(row.data)) return { ok: true, skipped: true };
-  /* 保护2：本地已有数据、且云端不比本地上次同步新 → 跳过覆盖（保留本地未上传改动，随后 push 会把本地同步上去） */
-  if (!force && localHasData() && lastSync() && row.updated_at && row.updated_at <= lastSync()) return { ok: true, skipped: true };
+  /* 保护2：本地已有数据、且云端不比本地上次同步新 → 不做整体覆盖（保留本地未上传改动），
+     但仍把云端独有的值班条目补齐：「另一台设备导入了值班、这边一直拉不到」就是被这条挡住的 */
+  if (!force && localHasData() && lastSync() && row.updated_at && row.updated_at <= lastSync()) {
+    const addDuty = mergeMissingDuty(row.data.duties);
+    if (addDuty) { syncPlanTasks(); return { ok: true, merged: true, duties: addDuty }; }
+    return { ok: true, skipped: true };
+  }
   /* 保护3：本地有数据但从未同步过（lastSync 为空）→ 首合同步：合并两端，绝不覆盖丢数据 */
   if (!force && localHasData() && !lastSync()) {
     mergeState(row.data);
     setLastSync(row.updated_at || new Date().toISOString());
     syncPlanTasks(); return { ok: true, merged: true };
   }
-  Object.keys(row.data).forEach((k) => { if (state[k] !== undefined) state[k] = row.data[k]; });
+  /* 整体覆盖：其余字段按云端为准，但值班走并集（本机已导入的不会被一份更旧的云端快照冲掉） */
+  const cloudDuty = row.data.duties;
+  Object.keys(row.data).forEach((k) => { if (state[k] !== undefined && k !== "duties") state[k] = row.data[k]; });
+  mergeMissingDuty(cloudDuty);
   setLastSync(row.updated_at || new Date().toISOString());
   syncPlanTasks(); return { ok: true };
 }
@@ -691,9 +725,9 @@ const Dashboard = {
     const todayHandle = computed(() => {
       const list = [];
       const overdue = state.tasks.filter((t) => !t.done && t.due && t.due < todayStr()).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 2);
-      overdue.forEach((t) => list.push({ urgent: true, flag: "逾期", flagCls: "", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks" }));
+      overdue.forEach((t) => list.push({ urgent: true, flag: "逾期", flagCls: "", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks", taskId: t.id }));
       const dueToday = state.tasks.filter((t) => !t.done && t.due === todayStr()).slice(0, 1);
-      dueToday.forEach((t) => list.push({ urgent: false, flag: "今日", flagCls: "warn", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks" }));
+      dueToday.forEach((t) => list.push({ urgent: false, flag: "今日", flagCls: "warn", text: t.title || t.name || "未命名任务", due: t.due, key: "tasks", taskId: t.id }));
       if (plantsNeed.value > 0) {
         const p = plantsDueSoon.value[0];
         list.push({ urgent: plantsNeed.value >= 3, flag: "养护", flagCls: plantsNeed.value >= 3 ? "" : "green", text: p ? (p.name + " 需浇水/施肥") : (plantsNeed.value + " 株植物待养护"), key: "plants" });
@@ -711,6 +745,16 @@ const Dashboard = {
       if (annivSoon7.value) n++;
       return n;
     });
+
+    /* 首页直接勾完成：标记任务 done（值班/备忘/纪念日派生出的待办，重建时保留完成态） */
+    function thDone(id, title) {
+      const t = state.tasks.find((x) => x.id === id);
+      if (!t) return;
+      t.done = true;
+      t.doneAt = Date.now();
+      syncPlanTasks();
+      showToast("已完成 ✓ " + String(title || "").replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, "").slice(0, 12));
+    }
 
     /* 快捷入口 · 6 个 */
     const quickActions = computed(() => ([
@@ -745,7 +789,7 @@ const Dashboard = {
       return any ? svgLine(out, outC, "月龄") : "";
     });
 
-    return { now, slogan, hintShow, lunar, week, dateText, dateTextShort, greeting, today, tasksActive, tasksToday, tasksOverdue, tasksDueNow, tasksRecent, plantsTotal, plantsNeed, plantsDueSoon, sportToday, sportRecent, finMonth, financeRecent, financeTodayCount, annivNear, annivSoon7, babyCount, todayHandle, todayHandleCount, quickActions, growthChart, iconSvg, iconFor, DOG_SVG };
+    return { now, slogan, hintShow, lunar, week, dateText, dateTextShort, greeting, today, tasksActive, tasksToday, tasksOverdue, tasksDueNow, tasksRecent, plantsTotal, plantsNeed, plantsDueSoon, sportToday, sportRecent, finMonth, financeRecent, financeTodayCount, annivNear, annivSoon7, babyCount, todayHandle, todayHandleCount, thDone, quickActions, growthChart, iconSvg, iconFor, DOG_SVG };
   },
   template: `
   <div>
@@ -790,10 +834,11 @@ const Dashboard = {
         </div>
       </div>
       <div v-if="todayHandle.length" class="th-list">
-        <div v-for="(h,i) in todayHandle" :key="i" class="th-item" :class="{urgent:h.urgent}" @click="$emit('goto',h.key)">
+        <div v-for="(h,i) in todayHandle" :key="h.taskId || (h.key + i)" class="th-item" :class="{urgent:h.urgent}" @click="$emit('goto',h.key)">
           <span class="th-flag" :class="h.flagCls">{{h.flag}}</span>
           <span class="th-text">{{h.text}}</span>
-          <span class="th-go">去处理 ›</span>
+          <button v-if="h.taskId" class="th-done" @click.stop="thDone(h.taskId, h.text)" title="标记完成">✓</button>
+          <span v-else class="th-go">去处理 ›</span>
         </div>
       </div>
       <div v-else class="th-empty">今天没有需要处理的事项，休息一下吧～</div>
@@ -1065,7 +1110,7 @@ const Tasks = {
       dutySync.show = false;
       showToast("已导入 " + n + " 条值班 ✓");
     }
-    function clearDuties() { state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
+    function clearDuties() { dutyClearedAt = Date.now(); state.duties = []; syncPlanTasks(); dutySync.msg = "已清空值班记录"; showToast("已清空值班"); }
 
     return { MOODS, WK, today, view, monthLabel, weeks, sel, selTodos, selMood, selLunar, selDay, prevMonth, nextMonth, goToday, pick, setMood, showMood, statusOf, form, openAdd, openEdit, save, toggle, del, clearDone, dutySync, dutyColorOf, dutyCount, openDuty, parseDutyText, importDutyText, clearDuties, holidayShort };
   },
@@ -1169,7 +1214,7 @@ const Tasks = {
     </modal>
 
     <modal :show="dutySync.show" :title="'值班'" @close="dutySync.show=false">
-      <div class="hint" style="margin:0 0 10px">值班清单<b>只在你自己浏览器里</b>，不上传、不随网站发布。把排班表里的值班信息整段复制粘贴到下面即可，写入后会在日历上按班次配色，并自动生成标注「🕒 值班」的待办。</div>
+      <div class="hint" style="margin:0 0 10px">值班清单只存在<b>你自己的浏览器和你的账号云备份</b>里，不会发布到网站。把排班表里的值班信息整段复制粘贴到下面即可，写入后会在日历上按班次配色，并自动生成标注「🕒 值班」的待办。</div>
       <div class="field" style="margin-bottom:8px">
         <textarea class="input" rows="6" v-model="dutySync.text" placeholder="每行一条，例如：&#10;2026-09-16 晚班A 17:30-19:30&#10;2026年9月18日 午班 11:40-12:30&#10;9月19日 周末班 09:00-17:30&#10;&#10;（日期支持 2026-09-16 / 2026年9月16日 / 9月16日；时间可省略；行尾可加 #颜色 自定义配色）"></textarea>
       </div>
